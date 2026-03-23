@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>San Ignacio Canteen Management System</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Dependencies -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    /* Quick inline styles for filter sections */
+    .filter-card {
+        display: flex; 
+        gap: 15px; 
+        align-items: flex-end; 
+        padding: 15px; 
+        background: white; 
+        border-radius: 8px; 
+        margin-bottom: 20px;
+        border: 1px solid #eee;
+    }
+    .total-badge {
+        margin-left: auto; 
+        text-align: right; 
+        background: #E8F5E9; 
+        padding: 10px 20px; 
+        border-radius: 8px; 
+        border: 1px solid #2E7D32;
+    }
+  </style>
+</head>
+<body class="app-body">
+
+<!-- =========== SIDEBAR =========== -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <span class="sidebar-logo-icon">🏫</span>
+      <div class="sidebar-logo-text">
+        <span class="slt-main">San Ignacio</span>
+        <span class="slt-sub">Canteen System</span>
+      </div>
+    </div>
+    <button class="sidebar-close" id="sidebarClose">✕</button>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-page="dashboard" href="#"><span class="nav-icon">📊</span> Dashboard</a>
+
+    <div class="nav-section-label manager-only">1. Weekly Supply</div>
+    <a class="nav-item manager-only" data-page="inventory" href="#"><span class="nav-icon">🛒</span> Grocery Shopping</a>
+
+    <div class="nav-section-label manager-only">2. Daily Operations</div>
+    <a class="nav-item manager-only" data-page="daily-records" href="#"><span class="nav-icon">📝</span> Daily Sales Ledger</a>
+
+    <div class="nav-section-label manager-only">3. School Funds</div>
+    <a class="nav-item manager-only" data-page="expenses" href="#"><span class="nav-icon">💸</span> Activity Allocations</a>
+
+    <div class="nav-section-label manager-only">Account</div>
+    <a class="nav-item manager-only" data-page="reports" href="#"><span class="nav-icon">📈</span> Reports</a>
+    <a class="nav-item manager-only" data-page="profile" href="#"><span class="nav-icon">👤</span> My Profile</a>
+
+    <div class="nav-section-label admin-only" id="adminNavSection" style="display:none;">Administration</div>
+    <a class="nav-item admin-only" data-page="admin" href="#" id="adminNavItem" style="display:none;"><span class="nav-icon">👥</span> User Management</a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-profile">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <div class="user-info">
+        <span class="user-name" id="userName">Loading…</span>
+        <span class="user-role" id="userRole">—</span>
+      </div>
+    </div>
+    <button class="btn-signout" id="signOutBtn">Sign Out</button>
+  </div>
+</aside>
+
+<div class="overlay" id="overlay"></div>
+
+<main class="main-content" id="mainContent">
+  <header class="topbar">
+    <button class="menu-toggle" id="menuToggle">☰</button>
+    <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    <div class="topbar-actions">
+      <button class="btn-icon" id="notifBtn">🔔</button>
+      <span class="topbar-date" id="topbarDate"></span>
+    </div>
+  </header>
+
+  <!-- DASHBOARD PAGE -->
+  <section class="page active" id="page-dashboard">
+    <div id="managerDashboardView" style="display:none;">
+        <div class="summary-cards">
+            <div class="summary-card green"><div class="sc-label">Total Daily Sales</div><div class="sc-value" id="dTotalSales">₱0.00</div></div>
+            <div class="summary-card amber"><div class="sc-label">Total Expenses</div><div class="sc-value" id="dTotalCost">₱0.00</div></div>
+            <div class="summary-card purple"><div class="sc-label">Net Profit</div><div class="sc-value" id="dNetIncome">₱0.00</div></div>
+        </div>
+        <div class="dashboard-grid">
+            <div class="card chart-card"><canvas id="salesTrendChart"></canvas></div>
+            <div class="card"><div id="mostProfitableList"></div></div>
+        </div>
+    </div>
+    <div id="adminDashboardView" style="display:none;">
+        <div class="summary-cards">
+            <div class="summary-card purple"><div class="sc-label">School Income</div><div class="sc-value">₱0.00</div></div>
+            <div class="summary-card green"><div class="sc-label">Active Managers</div><div class="sc-value" id="adminActiveCount">0</div></div>
+        </div>
+        <div class="card" style="margin-top:20px;"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead><tbody id="adminQuickUserList"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- =========== INVENTORY (WEEKLY SHOPPING) =========== -->
+  <section class="page" id="page-inventory">
+    <div class="page-header">
+      <h2 class="page-title">Weekly Supplies & Groceries</h2>
+      <button class="btn btn-primary" id="btnAddInventory" onclick="InventoryMgr.openModal()">+ Record New Shopping Trip</button>
+    </div>
+
+    <!-- Purchase History Filter -->
+    <div class="filter-card">
+      <div class="form-group"><label>From</label><input type="date" id="invFilterFrom" class="input"></div>
+      <div class="form-group"><label>To</label><input type="date" id="invFilterTo" class="input"></div>
+      <button class="btn btn-secondary" onclick="InventoryMgr.loadPurchaseHistory()">Filter History</button>
+      <div class="total-badge">
+        <span class="text-muted">Spent in Range:</span>
+        <h2 id="historyTotalSpent" style="color:#2E7D32; margin:0;">₱0.00</h2>
+      </div>
+    </div>
+
+    <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Item</th><th>Current Stock</th><th>Total Value</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="inventoryBody"></tbody>
+        </table>
+    </div>
+
+    <!-- Multi-Add Modal -->
+    <div class="modal-overlay" id="inventoryModal" style="display:none;">
+      <div class="modal modal-lg">
+        <div class="modal-header"><h3>Record Weekly Shopping Trip</h3><button class="modal-close" onclick="InventoryMgr.closeModal()">✕</button></div>
+        <div class="modal-body">
+          <div class="form-section"><label>Date:</label><input type="date" id="invPurchaseDate" class="input" style="max-width:200px"></div>
+          
+          <div class="form-grid" style="background:#f4f4f4; padding:15px; border-radius:8px; display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:10px; margin-bottom:15px;">
+            <div class="form-group"><label>Item</label><input type="text" id="tempItemName" class="input"></div>
+            <div class="form-group"><label>Qty</label><input type="number" id="tempQty" class="input"></div>
+            <div class="form-group"><label>Unit</label><input type="text" id="tempUnit" class="input" placeholder="kg"></div>
+            <div class="form-group"><label>Cost</label><input type="number" id="tempCost" class="input"></div>
+            <div class="form-group" style="display:flex; align-items:flex-end;"><button class="btn btn-secondary" onclick="InventoryMgr.addItemToList()" style="width:100%">+ Add</button></div>
+          </div>
+
+          <div class="table-wrapper" style="max-height:200px; overflow-y:auto; border:1px solid #eee;">
+            <table class="data-table">
+              <thead><tr><th>Item</th><th>Qty</th><th>Cost</th><th></th></tr></thead>
+              <tbody id="shoppingListBody"></tbody>
+            </table>
+          </div>
+
+          <div style="text-align:right; margin-top:15px;"><h3 style="color:#2E7D32">Trip Total: <span id="tripTotalDisplay">₱0.00</span></h3></div>
+          <div class="form-actions"><button class="btn btn-ghost" onclick="InventoryMgr.closeModal()">Cancel</button><button class="btn btn-primary" id="saveInventoryBtn" onclick="InventoryMgr.saveTripToStock()">Save Trip</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== MODAL FOR VIEWING DAILY LEDGER IN-SYSTEM =========== -->
+<div class="modal-overlay" id="viewLedgerModal" style="display:none;">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="viewLedgerTitle">Daily Ledger Details</h3>
+      <button class="modal-close" onclick="document.getElementById('viewLedgerModal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body" id="viewLedgerContent">
+      <!-- Content populated by JS -->
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" id="btnExportLedgerPDF">📄 Export as PDF</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('viewLedgerModal').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- =========== MODAL FOR VIEWING SHOPPING TRIP IN-SYSTEM =========== -->
+<div class="modal-overlay" id="viewTripModal" style="display:none;">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="viewTripTitle">Shopping Trip Summary</h3>
+      <button class="modal-close" onclick="document.getElementById('viewTripModal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body" id="viewTripContent">
+      <!-- Content populated by JS -->
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" id="btnExportTripPDF">📄 Export as PDF</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('viewTripModal').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
+  <!-- =========== DAILY RECORDS (LEDGER) =========== -->
+  <section class="page" id="page-daily-records">
+    <div class="page-header">
+      <h2 class="page-title">Daily Production Ledger</h2>
+      <div class="filter-group" style="display:flex; gap:10px; align-items:center;">
+        <input type="date" id="filterDateFrom" class="input-sm">
+        <span>to</span>
+        <input type="date" id="filterDateTo" class="input-sm">
+        <button class="btn btn-secondary btn-sm" onclick="DailyRecords.loadHistory()">Apply Filter</button>
+      </div>
+      <button class="btn btn-primary" id="btnAddRecord" onclick="DailyRecords.openModal()">+ Record Production</button>
+    </div>
+
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Gross Sales</th><th>Total Expenses</th><th>Net Profit</th><th>Actions</th></tr></thead>
+        <tbody id="recordsHistoryBody"></tbody>
+      </table>
+    </div>
+
+    <div class="modal-overlay" id="recordModal" style="display:none;">
+      <div class="modal modal-lg">
+        <div class="modal-header"><h3>Daily Production & Sales</h3><button class="modal-close" onclick="DailyRecords.closeModal()">✕</button></div>
+        <div class="modal-body">
+          <div class="form-section"><label>Ledger Date</label><input type="date" id="modalRecordDate" class="input" style="max-width:200px"></div>
+          
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Product Name</th>
+                <th>Qty Sold</th>
+                <th>Total Expense (Materials)</th>
+                <th>Selling Price</th>
+                <th>Total Sales</th>
+                <th>Profit</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="productsBody"></tbody>
+          </table>
+          <button class="btn btn-sm btn-outline" onclick="DailyRecords.addProductRow()" style="margin-top:10px;">+ Add Product</button>
+
+          <div class="record-summary-box" style="background:#E8F5E9; padding:20px; border-radius:10px; margin-top:20px; display:grid; grid-template-columns: 1fr 1fr 1fr; text-align:center;">
+              <div><span>TOTAL SALES</span><br><strong id="rsTotalSales">₱0.00</strong></div>
+              <div><span>TOTAL EXPENSES</span><br><strong id="rsTotalCost">₱0.00</strong></div>
+              <div><span>DAILY NET PROFIT</span><br><strong id="rsNetProfit">₱0.00</strong></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-ghost" onclick="DailyRecords.closeModal()">Cancel</button><button class="btn btn-primary" onclick="DailyRecords.saveRecord()">Save Entry</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- =========== SCHOOL ALLOCATIONS =========== -->
+  <section class="page" id="page-expenses">
+    <div class="page-header"><h2 class="page-title">School Activity Fund Allocations</h2><button class="btn btn-primary" id="btnAddExpense" onclick="ExpensesMgr.openModal()">+ New Allocation</button></div>
+    <div class="filter-card">
+        <div class="form-group"><label>Filter Month</label><input type="month" id="expenseMonthFilter" class="input"></div>
+        <div class="total-badge" style="background:#E3F2FD; border-color:#2196F3;">
+            <span class="text-muted">Available Profit:</span>
+            <h2 id="expMonthlyIncome" style="color:#2196F3; margin:0;">₱0.00</h2>
+        </div>
+        <div class="total-badge">
+            <span class="text-muted">Remaining Balance:</span>
+            <h2 id="expRemainingBalance" style="margin:0;">₱0.00</h2>
+        </div>
+    </div>
+    <div class="card"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Actions</th></tr></thead><tbody id="expensesBody"></tbody></table></div>
+
+    <div class="modal-overlay" id="expenseModal" style="display:none;">
+      <div class="modal">
+        <div class="modal-header"><h3>Record School Activity Cost</h3><button class="modal-close" onclick="ExpensesMgr.closeModal()">✕</button></div>
+        <div class="modal-body">
+          <div class="form-group"><label>Description</label><input type="text" id="expTitle" class="input"></div>
+          <div class="form-group"><label>Category</label>
+            <select id="expCategory" class="input">
+              <option value="F">F - Feeding</option>
+              <option value="C">C - Clinic</option>
+              <option value="FP">FP - Faculty/Pupils</option>
+              <option value="H">H - HE</option>
+              <option value="S">S - School Operation</option>
+              <option value="R">R - Revolving</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Amount (₱)</label><input type="number" id="expAmount" class="input"></div>
+          <div class="form-group"><label>Date</label><input type="date" id="expDate" class="input"></div>
+          <div class="form-actions"><button class="btn btn-primary" onclick="ExpensesMgr.saveExpense()">Save Deduction</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REMAINING PAGES -->
+  <section class="page" id="page-reports">
+    <div class="page-header"><h2 class="page-title">Reports</h2><button class="btn btn-secondary" id="exportPDFBtn">Export PDF</button></div>
+    <div class="card"><div id="reportOutput"></div></div>
+  </section>
+
+  <section class="page" id="page-profile">
+    <div class="page-header"><h2>Account Security</h2></div>
+    <div class="card" style="max-width:600px; margin:auto; padding:30px;">
+        <h2 id="profName">User</h2>
+        <p id="profEmail" class="text-muted"></p>
+        <hr>
+        <form id="changePasswordForm">
+            <div class="form-group"><label>Current Password</label><input type="password" id="currPass" class="input" required></div>
+            <div class="form-group"><label>New Password</label><input type="password" id="newPass" class="input" required></div>
+            <button type="submit" class="btn btn-primary">Update Password</button>
+        </form>
+    </div>
+  </section>
+
+  <section class="page" id="page-admin">
+    <div class="page-header"><h2>Manager Account Management</h2><button class="btn btn-primary" onclick="AdminPanel.openModal()">+ Add Manager</button></div>
+    <div class="summary-cards">
+        <div class="summary-card green"><div class="sc-label">Total Users</div><div id="adminTotalUsers">0</div></div>
+        <div class="summary-card blue"><div class="sc-label">Active Managers</div><div id="adminActiveManagers">0</div></div>
+    </div>
+    <div class="card"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+
+    <div class="modal-overlay" id="managerModal" style="display:none;">
+      <div class="modal">
+        <div class="modal-header"><h3>New Manager Account</h3><button class="modal-close" onclick="AdminPanel.closeModal()">✕</button></div>
+        <div class="modal-body">
+          <div class="form-group"><label>Full Name</label><input type="text" id="managerName" class="input"></div>
+          <div class="form-group"><label>Google Email</label><input type="email" id="managerEmail" class="input"></div>
+          <div class="form-group"><label>Temp Password</label><input type="text" id="managerTempPass" class="input"></div>
+          <div class="form-actions"><button class="btn btn-primary" onclick="AdminPanel.saveManager()">Create Account</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/daily-records.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/expenses.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

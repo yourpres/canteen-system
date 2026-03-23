@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - San Ignacio Canteen System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2E7D32; /* School Green */
+      --accent: #1B5E20;
+      --bg: #FFF8E1;      /* School Cream */
+      --white: #ffffff;
+      --text: #333333;
+      --error: #d32f2f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--bg);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+    }
+
+    .auth-card {
+      background: var(--white);
+      width: 100%;
+      max-width: 400px;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 15px 35px rgba(46, 125, 50, 0.1);
+    }
+
+    .brand { text-align: center; margin-bottom: 30px; }
+    .brand h1 { font-family: 'Fraunces', serif; color: var(--primary); font-size: 24px; }
+    .brand p { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+    
+    input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #EEE;
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: inherit;
+      transition: 0.3s;
+    }
+
+    input:focus { outline: none; border-color: var(--primary); }
+
+    .btn-auth {
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+
+    .btn-auth:hover { background: var(--accent); }
+
+    .toggle-link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+
+    .toggle-link a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .error-msg {
+      background: #ffebee;
+      color: var(--error);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+      text-align: center;
+    }
+
+    #signupFields { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="auth-card">
+    <div class="brand">
+      <div style="font-size: 40px;">🏫</div>
+      <h1 id="authTitle">Sign In</h1>
+      <p>San Ignacio Canteen</p>
+    </div>
+
+    <div id="errorMessage" class="error-msg"></div>
+
+    <form id="authForm">
+      <!-- Signup Only Fields (Role Dropdown Removed) -->
+      <div id="signupFields">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="fullName" placeholder="Enter Manager Name">
+        </div>
+      </div>
+
+      <!-- Login Fields -->
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="email" placeholder="email@school.edu" required>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn-auth">Sign In</button>
+    </form>
+
+    <div class="toggle-link">
+      <span id="toggleText">Don't have an account?</span> 
+      <a id="toggleAuth">Create Account</a>
+    </div>
+
+    <div style="margin-top: 15px; font-size: 11px; color: #999; text-align: center;">
+        Default Admin: <strong>admin@school.edu</strong> | <strong>admin123</strong>
+    </div>
+  </div>
+
+  <script>
+    const authForm = document.getElementById('authForm');
+    const signupFields = document.getElementById('signupFields');
+    const authTitle = document.getElementById('authTitle');
+    const submitBtn = document.getElementById('submitBtn');
+    const toggleAuth = document.getElementById('toggleAuth');
+    const toggleText = document.getElementById('toggleText');
+    const errorMessage = document.getElementById('errorMessage');
+
+    let isLogin = true;
+
+    // 1. Initialize Default Admin with password 'admin123'
+    (function init() {
+        const DB_KEY = 'canteen_users';
+        let users = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+        let admin = users.find(u => u.email === 'admin@school.edu');
+        
+        if (!admin) {
+            users.push({
+                id: 'admin_01',
+                name: 'System Principal',
+                email: 'admin@school.edu',
+                password: 'admin123',
+                role: 'admin',
+                active: true,
+                createdAt: new Date().toISOString()
+            });
+        } else {
+            admin.password = 'admin123'; // Ensure password is correct
+        }
+        localStorage.setItem(DB_KEY, JSON.stringify(users));
+    })();
+
+    // 2. Toggle UI
+    toggleAuth.addEventListener('click', () => {
+      isLogin = !isLogin;
+      errorMessage.style.display = "none";
+      if (isLogin) {
+        authTitle.textContent = "Sign In";
+        submitBtn.textContent = "Sign In";
+        toggleText.textContent = "Don't have an account?";
+        toggleAuth.textContent = "Create Account";
+        signupFields.style.display = "none";
+      } else {
+        authTitle.textContent = "Create Account";
+        submitBtn.textContent = "Sign Up";
+        toggleText.textContent = "Already have an account?";
+        toggleAuth.textContent = "Sign In";
+        signupFields.style.display = "block";
+      }
+    });
+
+    // 3. Handle Form Submission
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMessage.style.display = "none";
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const name = document.getElementById('fullName').value.trim();
+
+      try {
+          const users = JSON.parse(localStorage.getItem('canteen_users')) || [];
+          
+          if (isLogin) {
+              const user = users.find(u => u.email === email);
+              if (!user) throw new Error("Account not found.");
+              if (user.password !== password) throw new Error("Incorrect password.");
+              if (!user.active) throw new Error("Account deactivated by Admin.");
+
+              localStorage.setItem('isLoggedIn', 'true');
+              localStorage.setItem('userRole', user.role);
+              localStorage.setItem('userName', user.name);
+              localStorage.setItem('userEmail', user.email);
+              
+              submitBtn.textContent = "Verifying...";
+              setTimeout(() => window.location.href = 'app.html', 800);
+
+          } else {
+              // --- SIGN UP LOGIC (Auto-assign Manager Role) ---
+              if (!name) throw new Error("Full name is required.");
+              if (password.length < 6) throw new Error("Password must be 6+ characters.");
+              if (users.find(u => u.email === email)) throw new Error("Email already registered.");
+
+              const newUser = {
+                  id: 'u_' + Date.now(),
+                  name: name,
+                  email: email,
+                  password: password,
+                  role: 'manager', // Hardcoded role
+                  active: true,
+                  createdAt: new Date().toISOString()
+              };
+
+              users.push(newUser);
+              localStorage.setItem('canteen_users', JSON.stringify(users));
+
+              localStorage.setItem('isLoggedIn', 'true');
+              localStorage.setItem('userRole', 'manager');
+              localStorage.setItem('userName', name);
+              localStorage.setItem('userEmail', email);
+
+              submitBtn.textContent = "Creating Manager Account...";
+              setTimeout(() => window.location.href = 'app.html', 1000);
+          }
+      } catch (err) {
+          showError(err.message);
+      }
+    });
+
+    function showError(msg) {
+      errorMessage.textContent = msg;
+      errorMessage.style.display = "block";
+    }
+  </script>
+</body>
+</html>
