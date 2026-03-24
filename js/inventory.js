@@ -1,297 +1,313 @@
-// =============================================
-// Inventory Management Module (TRIP-BASED)
-// =============================================
-
 const InventoryMgr = {
-  currentTrip: [], 
-  DB_KEY: 'inventory_items',
-  HISTORY_KEY: 'inventory_history',
+    DB_KEY: 'inventory_items',
+    HIST_KEY: 'inventory_history',
+    currentTrip: [],
 
-  load() {
-    this.setupListeners();
-    this.loadInventory();
-    this.loadPurchaseHistory(); 
-  },
+    load() {
+        this.renderStockTable();
+        this.loadPurchaseHistory();
+    },
 
-  setupListeners() {
-    const openBtn = document.getElementById('btnAddInventory');
-    if (openBtn) {
-      openBtn.onclick = () => {
-        this.currentTrip = []; 
+    openModal() {
+        this.currentTrip = [];
         this.renderTripTable();
         document.getElementById('inventoryModal').style.display = 'flex';
-        document.getElementById('invPurchaseDate').value = new Date().toISOString().split('T')[0];
-      };
-    }
+        document.getElementById('invPurchaseDate').value = todayStr();
+    },
 
-    const saveBtn = document.getElementById('saveInventoryBtn');
-    if (saveBtn) saveBtn.onclick = () => this.saveTripToStock();
-  },
+    closeModal() { document.getElementById('inventoryModal').style.display = 'none'; },
 
-  // 1. ADD ITEM TO THE MODAL LIST
-  addItemToList() {
-    const nameInput = document.getElementById('tempItemName');
-    const qtyInput = document.getElementById('tempQty');
-    const costInput = document.getElementById('tempCost');
-    const unitInput = document.getElementById('tempUnit');
+    addItemToList() {
+        const name = document.getElementById('tempItemName').value.trim();
+        const qty = parseFloat(document.getElementById('tempQty').value) || 0;
+        const cost = parseFloat(document.getElementById('tempCost').value) || 0;
+        const unit = document.getElementById('tempUnit').value || 'pcs';
 
-    const name = nameInput.value.trim();
-    const qty = parseFloat(qtyInput.value) || 0;
-    const cost = parseFloat(costInput.value) || 0;
-    const unit = unitInput.value.trim() || 'pcs';
+        if (!name || qty <= 0) return showToast("Enter item name and quantity", "error");
 
-    if (!name || qty <= 0 || cost <= 0) {
-      showToast("Please enter item name, quantity, and cost.", "error");
-      return;
-    }
+        this.currentTrip.push({ id: Date.now(), name, qty, cost, unit });
+        this.renderTripTable();
 
-    this.currentTrip.push({
-      id: 'tmp_' + Date.now() + Math.random(),
-      name, qty, cost, unit
-    });
+        // Clear sub-inputs
+        document.getElementById('tempItemName').value = '';
+        document.getElementById('tempQty').value = '';
+        document.getElementById('tempCost').value = '';
+    },
 
-    nameInput.value = '';
-    qtyInput.value = '';
-    costInput.value = '';
-    nameInput.focus();
+    renderTripTable() {
+        const tbody = document.getElementById('shoppingListBody');
+        let total = 0;
+        tbody.innerHTML = this.currentTrip.map((item, idx) => {
+            total += item.cost;
+            return `<tr><td>${item.name}</td><td style="text-align:center;">${item.qty}</td><td>${item.unit}</td><td style="text-align:right; font-weight:600;">${formatCurrency(item.cost)}</td>
+                    <td style="text-align:center;"><button class="act-btn act-btn-delete" onclick="InventoryMgr.removeItem(${idx})">✕</button></td></tr>`;
+        }).join('');
+        document.getElementById('tripTotalDisplay').textContent = formatCurrency(total);
+        document.getElementById('tripItemCount').textContent = this.currentTrip.length + ' item' + (this.currentTrip.length !== 1 ? 's' : '');
+    },
 
-    this.renderTripTable();
-  },
+    removeItem(idx) { this.currentTrip.splice(idx, 1); this.renderTripTable(); },
 
-  renderTripTable() {
-    const tbody = document.getElementById('shoppingListBody');
-    let total = 0;
+    saveTripToStock() {
+        if (this.currentTrip.length === 0) return;
+        let stock = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
+        let history = JSON.parse(localStorage.getItem(this.HIST_KEY)) || [];
+        const date = document.getElementById('invPurchaseDate').value;
+        const tripId = 'trip_' + Date.now();
 
-    if (this.currentTrip.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" align="center" class="text-muted">No items added to trip yet.</td></tr>';
-      document.getElementById('tripTotalDisplay').textContent = "₱0.00";
-      return;
-    }
-
-    tbody.innerHTML = this.currentTrip.map((item, index) => {
-      total += item.cost;
-      return `
-        <tr>
-          <td>${item.name}</td>
-          <td>${item.qty} ${item.unit}</td>
-          <td>${formatCurrency(item.cost)}</td>
-          <td><button class="btn-delete" onclick="InventoryMgr.removeFromTrip(${index})">✕</button></td>
-        </tr>`;
-    }).join('');
-
-    document.getElementById('tripTotalDisplay').textContent = formatCurrency(total);
-  },
-
-  removeFromTrip(index) {
-    this.currentTrip.splice(index, 1);
-    this.renderTripTable();
-  },
-
-  // 2. SAVE TRIP TO STOCK
-  saveTripToStock() {
-    if (this.currentTrip.length === 0) {
-      showToast("Add at least one item to your shopping list.", "error");
-      return;
-    }
-
-    let mainInventory = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
-    let history = JSON.parse(localStorage.getItem(this.HISTORY_KEY)) || [];
-    const purchaseDate = document.getElementById('invPurchaseDate').value;
-    const tripId = 'trip_' + Date.now(); // Group items by a unique Trip ID
-
-    this.currentTrip.forEach(tripItem => {
-      const existingItem = mainInventory.find(i => i.name.toLowerCase().trim() === tripItem.name.toLowerCase().trim());
-      
-      if (existingItem) {
-        existingItem.quantity += tripItem.qty;
-        existingItem.totalValue += tripItem.cost;
-      } else {
-        mainInventory.push({
-          id: 'inv_' + Date.now() + Math.random(),
-          name: tripItem.name,
-          quantity: tripItem.qty,
-          unit: tripItem.unit,
-          unitCost: tripItem.cost / tripItem.qty,
-          totalValue: tripItem.cost,
-          minStock: 5
+        this.currentTrip.forEach(item => {
+            // Update current stock
+            const existing = stock.find(s => s.name.toLowerCase() === item.name.toLowerCase());
+            if (existing) {
+                existing.quantity += item.qty;
+                existing.totalValue += item.cost;
+            } else {
+                stock.push({ id: 'inv_'+Date.now()+Math.random(), name: item.name, quantity: item.qty, unit: item.unit, totalValue: item.cost, minStock: 5, category: 'General' });
+            }
+            // Save to history for reports
+            history.push({ tripId, date, ...item });
         });
-      }
 
-      history.push({
-        tripId: tripId,
-        date: purchaseDate,
-        name: tripItem.name,
-        qty: tripItem.qty,
-        unit: tripItem.unit,
-        cost: tripItem.cost
-      });
-    });
+        localStorage.setItem(this.DB_KEY, JSON.stringify(stock));
+        localStorage.setItem(this.HIST_KEY, JSON.stringify(history));
+        this.closeModal();
+        this.renderStockTable();
+        this.loadPurchaseHistory();
+        showToast("Weekly supply added to stock");
+    },
 
-    localStorage.setItem(this.DB_KEY, JSON.stringify(mainInventory));
-    localStorage.setItem(this.HISTORY_KEY, JSON.stringify(history));
+    renderStockTable() {
+        const items = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
+        document.getElementById('inventoryBody').innerHTML = items.length === 0 
+            ? '<tr><td colspan="6"><div class="tbl-empty"><div class="tbl-empty-icon">📦</div><p>No inventory items found.</p></div></td></tr>'
+            : items.map(i => {
+                const category = i.category || 'General';
+                const status = i.quantity < 5 ? 'Low' : 'OK';
+                const statusClass = i.quantity < 5 ? 'status-low' : 'status-ok';
+                return `
+                    <tr>
+                        <td><strong>${i.name}</strong></td>
+                        <td style="text-align:center;">${category}</td>
+                        <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">${i.quantity} ${i.unit}</td>
+                        <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">${formatCurrency(i.totalValue)}</td>
+                        <td style="text-align:center;"><span class="status-badge ${statusClass}">${status}</span></td>
+                        <td style="text-align:center;">
+                            <div class="action-group">
+                                <button class="act-btn act-btn-view" onclick="InventoryMgr.viewItem('${i.id}')">👁 View</button>
+                                <button class="act-btn act-btn-delete" onclick="InventoryMgr.deleteItem('${i.id}')">🗑 Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+    },
 
-    showToast(`Saved ${this.currentTrip.length} items to your stock.`);
-    this.closeModal();
-    this.loadInventory();
-    this.loadPurchaseHistory();
-  },
+    viewItem(id) {
+        const items = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+        
+        const editingItem = JSON.parse(JSON.stringify(item)); // Deep copy for editing
+        
+        const content = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:20px 0;">
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Item Name</p>
+                    <input type="text" id="editItemName" class="input" value="${item.name}" style="width:100%;">
+                </div>
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Category</p>
+                    <input type="text" id="editItemCategory" class="input" value="${item.category || 'General'}" style="width:100%;">
+                </div>
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Current Stock</p>
+                    <input type="number" id="editItemQty" class="input" value="${item.quantity}" style="width:100%;">
+                </div>
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Unit</p>
+                    <input type="text" id="editItemUnit" class="input" value="${item.unit}" style="width:100%;">
+                </div>
+            </div>
+        `;
+        document.getElementById('viewTripContent').innerHTML = content;
+        document.getElementById('viewTripTitle').textContent = `${item.name} - Edit Inventory`;
+        
+        // Update button to save
+        const btnExport = document.getElementById('btnExportTripPDF');
+        if(btnExport) {
+            btnExport.textContent = '💾 Save Changes';
+            btnExport.onclick = () => InventoryMgr.saveEditedItem(id);
+        }
+        
+        document.getElementById('viewTripModal').style.display = 'flex';
+    },
 
-  loadInventory() {
-    const items = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
-    const tbody = document.getElementById('inventoryBody');
-    if (!tbody) return;
+    saveEditedItem(id) {
+        const items = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
+        const idx = items.findIndex(i => i.id === id);
+        if(idx === -1) return;
+        
+        items[idx].name = document.getElementById('editItemName').value.trim();
+        items[idx].category = document.getElementById('editItemCategory').value.trim() || 'General';
+        items[idx].quantity = parseFloat(document.getElementById('editItemQty').value) || 0;
+        items[idx].unit = document.getElementById('editItemUnit').value.trim();
+        
+        localStorage.setItem(this.DB_KEY, JSON.stringify(items));
+        document.getElementById('viewTripModal').style.display = 'none';
+        this.renderStockTable();
+        showToast("Inventory item updated successfully", "success");
+    },
 
-    tbody.innerHTML = items.map(item => {
-      const isLow = item.quantity <= item.minStock;
-      return `
-        <tr>
-          <td><strong>${item.name}</strong></td>
-          <td class="${isLow ? 'text-red font-bold' : ''}">${item.quantity} ${item.unit}</td>
-          <td>${formatCurrency(item.totalValue)}</td>
-          <td><span class="status-badge ${isLow ? 'status-inactive' : 'status-active'}">
-              ${isLow ? '⚠️ Low' : '✅ OK'}</span></td>
-          <td>
-            <button class="btn-sm" onclick="InventoryMgr.deleteItem('${item.id}')">🗑</button>
-          </td>
-        </tr>`;
-    }).join('');
-    this.checkLowStockBadge();
-  },
+    loadPurchaseHistory() {
+        const history = JSON.parse(localStorage.getItem(this.HIST_KEY)) || [];
+        const from = document.getElementById('invFilterFrom').value;
+        const to = document.getElementById('invFilterTo').value;
+        let filtered = history;
+        
+        // Apply filter based on what dates are provided
+        if(from || to) {
+            filtered = history.filter(h => {
+                if(from && to) return h.date >= from && h.date <= to;
+                if(from) return h.date >= from;
+                if(to) return h.date <= to;
+                return true;
+            });
+        }
 
-  // 3. LOAD HISTORY (GROUPED BY TRIP)
-  loadPurchaseHistory() {
-    const fromDate = document.getElementById('invFilterFrom').value;
-    const toDate = document.getElementById('invFilterTo').value;
-    const tbody = document.getElementById('purchaseHistoryBody');
-    if (!tbody) return;
-    
-    let history = JSON.parse(localStorage.getItem(this.HISTORY_KEY)) || [];
-    
-    if (fromDate && toDate) {
-      history = history.filter(h => h.date >= fromDate && h.date <= toDate);
+        let total = 0;
+        document.getElementById('purchaseHistoryBody').innerHTML = filtered.length === 0
+            ? '<tr><td colspan="6"><div class="tbl-empty"><div class="tbl-empty-icon">📋</div><p>No items found for selected date range.</p></div></td></tr>'
+            : filtered.map((h, idx) => {
+                total += h.cost;
+                return `
+                    <tr>
+                        <td style="text-align:left;">${h.date}</td>
+                        <td style="text-align:left;"><strong>${h.name}</strong></td>
+                        <td style="text-align:center; font-variant-numeric:tabular-nums; font-weight:600;">${h.qty}</td>
+                        <td style="text-align:left;">${h.unit}</td>
+                        <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">${formatCurrency(h.cost)}</td>
+                        <td style="text-align:center;">
+                            <div class="action-group">
+                                <button class="act-btn act-btn-view" onclick="InventoryMgr.viewPurchaseItem('${h.tripId}')">👁 View</button>
+                                <button class="act-btn act-btn-delete" onclick="InventoryMgr.deletePurchaseItem('${h.tripId}', '${h.name}', '${h.date}')">🗑 Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        document.getElementById('historyTotalSpent').textContent = formatCurrency(total);
+    },
+
+    viewPurchaseItem(tripId) {
+        const history = JSON.parse(localStorage.getItem(this.HIST_KEY)) || [];
+        const index = history.findIndex(h => h.tripId === tripId);
+        const h = history[index];
+        
+        if (!h || index === -1) return showToast('Purchase record not found', 'error');
+        
+        const content = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:20px 0;">
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Date</p>
+                    <input type="date" id="editPurchDate" class="input" value="${h.date}" style="width:100%;">
+                </div>
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Item Name</p>
+                    <input type="text" id="editPurchName" class="input" value="${h.name}" style="width:100%;">
+                </div>
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Quantity</p>
+                    <input type="number" id="editPurchQty" class="input" value="${h.qty}" style="width:100%;">
+                </div>
+                <div>
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Unit</p>
+                    <input type="text" id="editPurchUnit" class="input" value="${h.unit}" style="width:100%;">
+                </div>
+                <div style="grid-column:1 / -1;">
+                    <p style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:6px;">Cost (₱)</p>
+                    <input type="number" id="editPurchCost" class="input" value="${h.cost}" step="0.01" style="width:100%;">
+                </div>
+            </div>
+        `;
+        document.getElementById('viewTripContent').innerHTML = content;
+        document.getElementById('viewTripTitle').textContent = `${h.name} - Edit Purchase Record`;
+        
+        // Store index for proper updates
+        window.currentEditingPurchaseIndex = index;
+        window.currentEditingPurchase = JSON.parse(JSON.stringify(h));
+        
+        // Update button to save
+        const btnExport = document.getElementById('btnExportTripPDF');
+        if(btnExport) {
+            btnExport.textContent = '💾 Save Changes';
+            btnExport.onclick = () => InventoryMgr.saveEditedPurchase(index);
+        }
+        
+        document.getElementById('viewTripModal').style.display = 'flex';
+    },
+
+    saveEditedPurchase(index) {
+        let history = JSON.parse(localStorage.getItem(this.HIST_KEY)) || [];
+        
+        if(index < 0 || index >= history.length) {
+            return showToast("Purchase record not found", "error");
+        }
+        
+        // Update with new values using index
+        history[index].date = document.getElementById('editPurchDate').value;
+        history[index].name = document.getElementById('editPurchName').value.trim();
+        history[index].qty = parseFloat(document.getElementById('editPurchQty').value) || 0;
+        history[index].unit = document.getElementById('editPurchUnit').value.trim();
+        history[index].cost = parseFloat(document.getElementById('editPurchCost').value) || 0;
+        
+        if(!history[index].name || history[index].qty <= 0 || history[index].cost <= 0) {
+            return showToast("Please fill in all required fields", "error");
+        }
+        
+        localStorage.setItem(this.HIST_KEY, JSON.stringify(history));
+        document.getElementById('viewTripModal').style.display = 'none';
+        this.loadPurchaseHistory();
+        showToast("Purchase record updated successfully", "success");
+    },
+
+    deletePurchaseItem(tripId, name, date) {
+        if (!confirm(`Delete purchase record for ${name} on ${date}?`)) return;
+        
+        let history = JSON.parse(localStorage.getItem(this.HIST_KEY)) || [];
+        history = history.filter(h => !(h.tripId === tripId && h.name === name && h.date === date));
+        localStorage.setItem(this.HIST_KEY, JSON.stringify(history));
+        this.loadPurchaseHistory();
+        showToast("Purchase record deleted successfully", "success");
+    },
+
+    deleteItem(id) {
+        if (!confirm("Delete this inventory item?")) return;
+        let items = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
+        items = items.filter(i => i.id !== id);
+        localStorage.setItem(this.DB_KEY, JSON.stringify(items));
+        this.renderStockTable();
+        showToast("Inventory item deleted successfully", "success");
+    },
+
+    exportShoppingHistoryPDF() {
+        const from = document.getElementById('invFilterFrom').value;
+        const to = document.getElementById('invFilterTo').value;
+        const history = JSON.parse(localStorage.getItem(this.HIST_KEY)) || [];
+        
+        if (!from && !to) return showToast("Please select at least one date", "error");
+        
+        const filtered = history.filter(h => {
+            if(from && to) return h.date >= from && h.date <= to;
+            if(from) return h.date >= from;
+            if(to) return h.date <= to;
+            return true;
+        });
+        if (filtered.length === 0) return showToast("No items found for the selected date range", "error");
+        
+        // Call async function
+        Reports.exportShoppingHistoryPDF(filtered, from, to).catch(err => {
+            console.error('PDF export error:', err);
+            showToast("Error generating PDF", "error");
+        });
     }
-
-    // Grouping by tripId for the "In-System View"
-    const trips = {};
-    history.forEach(item => {
-      if (!trips[item.tripId]) {
-        trips[item.tripId] = { date: item.date, total: 0, itemsCount: 0, items: [] };
-      }
-      trips[item.tripId].total += item.cost;
-      trips[item.tripId].itemsCount++;
-      trips[item.tripId].items.push(item);
-    });
-
-    const sortedTripIds = Object.keys(trips).sort((a, b) => new Date(trips[b].date) - new Date(trips[a].date));
-
-    let totalSpentInRange = 0;
-    tbody.innerHTML = sortedTripIds.map(id => {
-      const t = trips[id];
-      totalSpentInRange += t.total;
-      return `
-        <tr>
-          <td><strong>${t.date}</strong></td>
-          <td>Shopping Trip (${t.itemsCount} items)</td>
-          <td>${t.itemsCount} Items</td>
-          <td class="font-bold">${formatCurrency(t.total)}</td>
-          <td style="text-align:center;">
-             <button class="action-btn btn-view" onclick="InventoryMgr.viewTripDetails('${id}')">👁 View Trip</button>
-          </td>
-        </tr>`;
-    }).join('');
-
-    if (sortedTripIds.length === 0) tbody.innerHTML = '<tr><td colspan="5" align="center" class="text-muted">No history found for this range.</td></tr>';
-    
-    document.getElementById('historyTotalSpent').textContent = formatCurrency(totalSpentInRange);
-  },
-
-  // 4. IN-SYSTEM VIEW & PDF EXPORT
-  viewTripDetails(tripId) {
-    const history = JSON.parse(localStorage.getItem(this.HISTORY_KEY)) || [];
-    const tripItems = history.filter(h => h.tripId === tripId);
-    if (tripItems.length === 0) return;
-
-    const purchaseDate = tripItems[0].date;
-    const totalSpent = tripItems.reduce((sum, h) => sum + h.cost, 0);
-    const managerName = localStorage.getItem('userName') || "Canteen Manager";
-
-    const content = document.getElementById('viewTripContent');
-    document.getElementById('viewTripTitle').textContent = `Shopping Trip: ${purchaseDate}`;
-
-    content.innerHTML = `
-      <div style="border: 1px solid #ddd; padding: 20px; background: #fff;">
-        <h3 style="color:#2E7D32; margin-top:0;">SAN IGNACIO ELEMENTARY SCHOOL</h3>
-        <p><strong>Transaction Date:</strong> ${purchaseDate}</p>
-        <table class="data-table">
-          <thead><tr><th>Item Name</th><th>Quantity</th><th>Total Cost</th></tr></thead>
-          <tbody>
-            ${tripItems.map(i => `<tr><td>${i.name}</td><td>${i.qty} ${i.unit}</td><td>${formatCurrency(i.cost)}</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <div style="text-align:right; margin-top:15px; border-top: 2px solid #2E7D32; padding-top: 10px;">
-          <h3 style="margin:0;">Total Trip Cost: ${formatCurrency(totalSpent)}</h3>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('viewTripModal').style.display = 'flex';
-
-    // PDF Export Function
-    document.getElementById('btnExportTripPDF').onclick = () => {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      
-      doc.setFontSize(18);
-      doc.setTextColor(46, 125, 50);
-      doc.text("SAN IGNACIO ELEMENTARY SCHOOL", 105, 20, { align: "center" });
-      
-      doc.setFontSize(12);
-      doc.setTextColor(100);
-      doc.text("Weekly Canteen Supply Procurement Summary", 105, 28, { align: "center" });
-      doc.text(`Purchase Date: ${purchaseDate}`, 105, 35, { align: "center" });
-
-      doc.autoTable({
-        startY: 45,
-        head: [['Item Name', 'Quantity Purchased', 'Cost (PhP)']],
-        body: tripItems.map(i => [i.name, `${i.qty} ${i.unit}`, formatCurrency(i.cost)]),
-        theme: 'grid',
-        headStyles: { fillColor: [46, 125, 50] }
-      });
-
-      let finalY = doc.lastAutoTable.finalY + 15;
-      doc.setFontSize(14);
-      doc.setTextColor(0);
-      doc.text(`GRAND TOTAL: ${formatCurrency(totalSpent)}`, 190, finalY, { align: "right" });
-
-      doc.setFontSize(11);
-      doc.text("Prepared by:", 20, finalY + 20);
-      doc.text("__________________________", 20, finalY + 30);
-      doc.text(managerName, 25, finalY + 35);
-      doc.text("Canteen Manager", 25, finalY + 40);
-
-      doc.save(`Shopping_Trip_${purchaseDate}.pdf`);
-    };
-  },
-
-  closeModal() {
-    document.getElementById('inventoryModal').style.display = 'none';
-  },
-
-  deleteItem(id) {
-    if (confirm("Delete this item from stock records?")) {
-      let items = JSON.parse(localStorage.getItem(this.DB_KEY)).filter(i => i.id !== id);
-      localStorage.setItem(this.DB_KEY, JSON.stringify(items));
-      this.loadInventory();
-    }
-  },
-
-  checkLowStockBadge() {
-    const items = JSON.parse(localStorage.getItem(this.DB_KEY)) || [];
-    const lowCount = items.filter(i => i.quantity <= i.minStock).length;
-    const badge = document.getElementById('inventoryBadge');
-    if (badge) {
-      badge.textContent = lowCount;
-      badge.style.display = lowCount > 0 ? 'inline' : 'none';
-    }
-  }
 };

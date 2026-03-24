@@ -6,7 +6,7 @@
   <title>San Ignacio Canteen Management System</title>
   <link rel="stylesheet" href="css/main.css">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+
   <!-- Dependencies -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -16,24 +16,362 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
   <style>
-    /* Quick inline styles for filter sections */
-    .filter-card {
-        display: flex; 
-        gap: 15px; 
-        align-items: flex-end; 
-        padding: 15px; 
-        background: white; 
-        border-radius: 8px; 
-        margin-bottom: 20px;
-        border: 1px solid #eee;
+    /* ===================================================
+       EXTENDED PAGE STYLES
+       =================================================== */
+
+    /* ── TABLE ALIGNMENT ENFORCEMENT ── */
+    .data-table th,
+    .data-table td {
+      vertical-align: middle;
     }
-    .total-badge {
-        margin-left: auto; 
-        text-align: right; 
-        background: #E8F5E9; 
-        padding: 10px 20px; 
-        border-radius: 8px; 
-        border: 1px solid #2E7D32;
+    .data-table th.th-right,
+    .data-table td.td-right {
+      text-align: right;
+    }
+    .data-table th.th-center,
+    .data-table td.td-center {
+      text-align: center;
+    }
+    .data-table td.td-nowrap {
+      white-space: nowrap;
+    }
+    .data-table td.td-mono {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+
+    /* ── ACTION BUTTON GROUP ── */
+    .action-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .act-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .act-btn-view {
+      background: #eef7ee;
+      color: #1e6b1e;
+      border-color: #a8d8a8;
+    }
+    .act-btn-view:hover {
+      background: #1e6b1e;
+      color: #fff;
+      border-color: #1e6b1e;
+    }
+    .act-btn-edit {
+      background: #eff4ff;
+      color: #1a4dbd;
+      border-color: #b8d0fc;
+    }
+    .act-btn-edit:hover {
+      background: #1a4dbd;
+      color: #fff;
+      border-color: #1a4dbd;
+    }
+    .act-btn-delete {
+      background: #fff1f1;
+      color: #be1c1c;
+      border-color: #fdc5c5;
+    }
+    .act-btn-delete:hover {
+      background: #be1c1c;
+      color: #fff;
+      border-color: #be1c1c;
+    }
+
+    /* ── FILTER BAR ── */
+    .filter-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 18px;
+    }
+    .filter-bar .form-group label {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    /* ── STAT CHIPS ── */
+    .stat-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      padding: 8px 14px;
+      background: var(--green-ghost);
+      border: 1px solid var(--green-pale);
+      border-radius: var(--radius);
+      min-width: 120px;
+    }
+    .stat-chip-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+    .stat-chip-value {
+      font-family: var(--font-head);
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+    }
+    .stat-chip.blue   { background: var(--blue-light);   border-color: #b8d0fc; }
+    .stat-chip.blue   .stat-chip-value { color: var(--blue); }
+    .stat-chip.amber  { background: var(--amber-light);  border-color: #f5d78a; }
+    .stat-chip.amber  .stat-chip-value { color: var(--amber); }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      padding-left: 2px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .section-header h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+
+    /* ── KPI CARDS (Dashboard) ── */
+    .dash-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 20px 16px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .kpi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .kpi-card.green::before  { background: linear-gradient(90deg, var(--green-dark), var(--green-light)); }
+    .kpi-card.amber::before  { background: linear-gradient(90deg, #b45309, #f59e0b); }
+    .kpi-card.purple::before { background: linear-gradient(90deg, #6b21a8, #a855f7); }
+    .kpi-card.blue::before   { background: linear-gradient(90deg, #1e3a8a, #3b82f6); }
+    .kpi-icon {
+      width: 36px; height: 36px;
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 12px;
+    }
+    .kpi-card.green  .kpi-icon { background: var(--green-ghost); }
+    .kpi-card.amber  .kpi-icon { background: var(--amber-light); }
+    .kpi-card.purple .kpi-icon { background: var(--purple-light); }
+    .kpi-card.blue   .kpi-icon { background: var(--blue-light); }
+    .kpi-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 6px; }
+    .kpi-value { font-family: var(--font-head); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--text-dark); }
+    .kpi-card.green  .kpi-value { color: var(--green); }
+    .kpi-card.amber  .kpi-value { color: var(--amber); }
+    .kpi-card.purple .kpi-value { color: var(--purple); }
+    .kpi-card.blue   .kpi-value { color: var(--blue); }
+    .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+    .dash-main-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .dash-chart-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .dash-chart-card .card-header {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      background: #fafafa; display: flex; align-items: center; justify-content: space-between;
+    }
+    .dash-chart-card .card-header h3 { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+    .dash-chart-body { padding: 16px 18px; }
+    .dash-rank-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .dash-rank-card .card-header {
+      padding: 14px 18px; border-bottom: 1px solid var(--border); background: #fafafa;
+    }
+    .dash-rank-card .card-header h3 { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+
+    /* ── SHOPPING MODAL ── */
+    .item-input-bar {
+      display: grid;
+      grid-template-columns: 2.2fr 0.8fr 0.9fr 1.1fr auto;
+      gap: 10px;
+      align-items: flex-end;
+      padding: 14px 16px;
+      background: #fafafa;
+      border: 1.5px dashed var(--border-dark);
+      border-radius: var(--radius-lg);
+      margin-bottom: 14px;
+    }
+    .trip-total-box {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 17px;
+      background: var(--green-ghost); border: 1px solid var(--green-pale);
+      border-radius: var(--radius-lg); margin-top: 14px;
+    }
+    .trip-total-box .ttl-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+    .trip-total-box .ttl-value { font-family: var(--font-head); font-size: 22px; font-weight: 700; color: var(--green); }
+
+    /* ── MODAL DATE HEADER ── */
+    .modal-date-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 11px 14px;
+      background: #fafafa; border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 16px;
+    }
+    .modal-date-header label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-muted); white-space: nowrap;
+    }
+
+    /* ── DAILY RECORD SUMMARY ── */
+    .record-summary-inline {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0;
+      border: 1px solid var(--green-pale); border-radius: var(--radius-lg);
+      overflow: hidden; margin-top: 18px;
+    }
+    .rsi-cell {
+      padding: 14px 18px; background: var(--green-ghost); text-align: center;
+      border-right: 1px solid var(--green-pale);
+    }
+    .rsi-cell:last-child { border-right: none; }
+    .rsi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-muted); margin-bottom: 5px; }
+    .rsi-val { font-family: var(--font-head); font-size: 20px; font-weight: 700; color: var(--text-dark); }
+    .rsi-val.profit  { color: var(--green); }
+    .rsi-val.expense { color: var(--red); }
+
+    /* ── EXPENSE CATEGORY GRID ── */
+    .expense-cat-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      padding: 14px 16px; border-bottom: 1px solid var(--border); background: #fafafa;
+    }
+    .exp-cat-pill {
+      display: flex; flex-direction: column; padding: 10px 13px;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); transition: box-shadow 0.15s ease;
+    }
+    .exp-cat-pill:hover { box-shadow: var(--shadow-md); }
+    .ecp-code   { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 3px; }
+    .ecp-name   { font-size: 12px; font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
+    .ecp-amount { font-family: var(--font-head); font-size: 16px; font-weight: 700; color: var(--green); }
+
+    /* ── PROFILE ── */
+    .profile-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 18px;
+    }
+    .profile-card-main {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .profile-cover {
+      height: 80px;
+      background: linear-gradient(135deg, var(--green-dark), var(--green-mid));
+    }
+    .profile-avatar-wrap { padding: 0 22px; margin-top: -26px; margin-bottom: 14px; }
+    .profile-avatar-lg {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, var(--green), var(--green-light));
+      border-radius: 13px; border: 3px solid var(--white);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 700; color: var(--white);
+      box-shadow: var(--shadow-md);
+    }
+    .profile-info { padding: 0 22px 22px; }
+    .profile-name  { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--text-dark); margin-bottom: 3px; }
+    .profile-email { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .profile-detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 0; border-bottom: 1px solid var(--border);
+    }
+    .profile-detail-row:last-child { border-bottom: none; }
+    .pdr-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+    .pdr-value { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+    .pw-form-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .pw-form-card .card-header { padding: 14px 20px; background: #fafafa; border-bottom: 1px solid var(--border); }
+    .pw-form-card .card-header h3 { font-size: 14px; font-weight: 700; color: var(--text-dark); }
+    .pw-form-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .pw-strength { display: flex; gap: 4px; margin-top: 6px; }
+    .pw-bar { flex: 1; height: 3px; border-radius: 2px; background: var(--border); }
+    .pw-bar.active { background: var(--green); }
+
+    /* ── TABLE EMPTY STATE ── */
+    .tbl-empty { text-align: center; padding: 32px 20px; color: var(--text-muted); }
+    .tbl-empty-icon { font-size: 28px; margin-bottom: 8px; }
+    .tbl-empty p { font-size: 13px; font-weight: 500; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1200px) {
+      .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 1100px) {
+      .dash-main-grid { grid-template-columns: 1fr; }
+      .profile-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .dash-kpi-grid { grid-template-columns: 1fr 1fr; }
+      .expense-cat-grid { grid-template-columns: 1fr 1fr; }
+      .item-input-bar { grid-template-columns: 1fr 1fr; }
+      .record-summary-inline { grid-template-columns: 1fr; }
+      .rsi-cell { border-right: none; border-bottom: 1px solid var(--green-pale); }
+      .rsi-cell:last-child { border-bottom: none; }
+    }
+    @media (max-width: 480px) {
+      .dash-kpi-grid { grid-template-columns: 1fr; }
+      .expense-cat-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -53,23 +391,37 @@
   </div>
 
   <nav class="sidebar-nav">
-    <a class="nav-item active" data-page="dashboard" href="#"><span class="nav-icon">📊</span> Dashboard</a>
+    <a class="nav-item active" data-page="dashboard" href="#">
+      <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+    </a>
 
     <div class="nav-section-label manager-only">1. Weekly Supply</div>
-    <a class="nav-item manager-only" data-page="inventory" href="#"><span class="nav-icon">🛒</span> Grocery Shopping</a>
+    <a class="nav-item manager-only" data-page="inventory" href="#">
+      <span class="nav-icon">🛒</span><span class="nav-label">Grocery Shopping</span>
+    </a>
 
     <div class="nav-section-label manager-only">2. Daily Operations</div>
-    <a class="nav-item manager-only" data-page="daily-records" href="#"><span class="nav-icon">📝</span> Daily Sales Ledger</a>
+    <a class="nav-item manager-only" data-page="daily-records" href="#">
+      <span class="nav-icon">📝</span><span class="nav-label">Daily Sales Ledger</span>
+    </a>
 
     <div class="nav-section-label manager-only">3. School Funds</div>
-    <a class="nav-item manager-only" data-page="expenses" href="#"><span class="nav-icon">💸</span> Activity Allocations</a>
+    <a class="nav-item manager-only" data-page="expenses" href="#">
+      <span class="nav-icon">💸</span><span class="nav-label">Activity Allocations</span>
+    </a>
 
     <div class="nav-section-label manager-only">Account</div>
-    <a class="nav-item manager-only" data-page="reports" href="#"><span class="nav-icon">📈</span> Reports</a>
-    <a class="nav-item manager-only" data-page="profile" href="#"><span class="nav-icon">👤</span> My Profile</a>
+    <a class="nav-item manager-only" data-page="reports" href="#">
+      <span class="nav-icon">📈</span><span class="nav-label">Reports</span>
+    </a>
+    <a class="nav-item manager-only" data-page="profile" href="#">
+      <span class="nav-icon">👤</span><span class="nav-label">My Profile</span>
+    </a>
 
     <div class="nav-section-label admin-only" id="adminNavSection" style="display:none;">Administration</div>
-    <a class="nav-item admin-only" data-page="admin" href="#" id="adminNavItem" style="display:none;"><span class="nav-icon">👥</span> User Management</a>
+    <a class="nav-item admin-only" data-page="admin" href="#" id="adminNavItem" style="display:none;">
+      <span class="nav-icon">👥</span><span class="nav-label">User Management</span>
+    </a>
   </nav>
 
   <div class="sidebar-footer">
@@ -80,278 +432,880 @@
         <span class="user-role" id="userRole">—</span>
       </div>
     </div>
-    <button class="btn-signout" id="signOutBtn">Sign Out</button>
+    <button class="btn-signout" id="signOutBtn">↩ Sign Out</button>
   </div>
 </aside>
 
 <div class="overlay" id="overlay"></div>
 
+<!-- =========== MAIN CONTENT =========== -->
 <main class="main-content" id="mainContent">
   <header class="topbar">
     <button class="menu-toggle" id="menuToggle">☰</button>
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
     <div class="topbar-actions">
-      <button class="btn-icon" id="notifBtn">🔔</button>
+      <button class="btn-icon" id="notifBtn" title="Notifications">
+        🔔<span class="notif-dot" id="notifDot" style="display:none;"></span>
+      </button>
+      <div class="topbar-clock" id="topbarClock" title="Current time">
+        <span id="clockDisplay">--:--:-- --</span>
+      </div>
       <span class="topbar-date" id="topbarDate"></span>
     </div>
   </header>
 
-  <!-- DASHBOARD PAGE -->
+  <!-- Notification Panel -->
+  <div class="notif-panel" id="notifPanel" style="display:none;">
+    <div class="notif-panel-header">
+      <h4>Notifications</h4>
+      <button id="clearNotifs">Clear All</button>
+    </div>
+    <div class="notif-list" id="notifList">
+      <p class="notif-empty">No notifications</p>
+    </div>
+  </div>
+
+  <!-- ===========================================================
+       DASHBOARD
+       =========================================================== -->
   <section class="page active" id="page-dashboard">
+
+    <!-- MANAGER VIEW -->
     <div id="managerDashboardView" style="display:none;">
-        <div class="summary-cards">
-            <div class="summary-card green"><div class="sc-label">Total Daily Sales</div><div class="sc-value" id="dTotalSales">₱0.00</div></div>
-            <div class="summary-card amber"><div class="sc-label">Total Expenses</div><div class="sc-value" id="dTotalCost">₱0.00</div></div>
-            <div class="summary-card purple"><div class="sc-label">Net Profit</div><div class="sc-value" id="dNetIncome">₱0.00</div></div>
+      <div class="page-header">
+        <h2 class="page-title">Canteen Financial Overview</h2>
+      </div>
+
+      <div class="filter-bar" style="margin-bottom:20px;">
+        <div class="form-group">
+          <label>Dashboard Period</label>
+          <select id="dashboardPeriodFilter" class="input-sm">
+            <option value="daily">Today</option>
+            <option value="weekly">This Week</option>
+            <option value="monthly">This Month</option>
+            <option value="quarterly">This Quarter</option>
+            <option value="yearly">This Year</option>
+            <option value="custom">Custom Range</option>
+          </select>
         </div>
-        <div class="dashboard-grid">
-            <div class="card chart-card"><canvas id="salesTrendChart"></canvas></div>
-            <div class="card"><div id="mostProfitableList"></div></div>
+        <div class="form-group">
+          <label>From Date</label>
+          <input type="date" id="dashboardDateFrom" class="input-sm">
         </div>
+        <div class="form-group">
+          <label>To Date</label>
+          <input type="date" id="dashboardDateTo" class="input-sm">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="Dashboard.applyDateFilter()">Apply Filter</button>
+        <button class="btn btn-outline btn-sm" onclick="Dashboard.resetDateFilter()">Reset</button>
+      </div>
+
+      <div class="dash-kpi-grid">
+        <div class="kpi-card green">
+          <div class="kpi-icon">💰</div>
+          <div class="kpi-label">Total Sales</div>
+          <div class="kpi-value" id="dTotalSales">₱0.00</div>
+          <div class="kpi-sub" id="dSalesTrend">Gross revenue this period</div>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-icon">🛒</div>
+          <div class="kpi-label">Weekly Supply Cost</div>
+          <div class="kpi-value" id="dWeeklySupplyCost">₱0.00</div>
+          <div class="kpi-sub" id="dSupplyTrend">Purchases in this period</div>
+        </div>
+        <div class="kpi-card purple">
+          <div class="kpi-icon">🏫</div>
+          <div class="kpi-label">School Funds Used</div>
+          <div class="kpi-value" id="dSchoolFunds">₱0.00</div>
+          <div class="kpi-sub" id="dFundsTrend">Allocations in this period</div>
+        </div>
+        <div class="kpi-card blue">
+          <div class="kpi-icon">📈</div>
+          <div class="kpi-label">Net Budget Balance</div>
+          <div class="kpi-value" id="dNetIncome">₱0.00</div>
+          <div class="kpi-sub" id="dNetTrend">Sales minus supply and school funds</div>
+        </div>
+      </div>
+
+      <div class="dash-kpi-grid" style="grid-template-columns: repeat(3,1fr);">
+        <div class="kpi-card green">
+          <div class="kpi-icon">📅</div>
+          <div class="kpi-label">Weekly Budget Summary</div>
+          <div class="kpi-value" id="dWeeklyBudget">₱0.00</div>
+          <div class="kpi-sub" id="dWeeklyBudgetSub">Current week remaining budget</div>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-icon">🗓️</div>
+          <div class="kpi-label">Monthly Budget Summary</div>
+          <div class="kpi-value" id="dMonthlyBudget">₱0.00</div>
+          <div class="kpi-sub" id="dMonthlyBudgetSub">Current month remaining budget</div>
+        </div>
+        <div class="kpi-card blue">
+          <div class="kpi-icon">⚖️</div>
+          <div class="kpi-label">Budget Usage Rate</div>
+          <div class="kpi-value" id="dBudgetUsageRate">0%</div>
+          <div class="kpi-sub" id="dBudgetUsageSub">Supply + funds compared to sales</div>
+        </div>
+      </div>
+
+      <div class="dash-main-grid">
+        <div class="dash-chart-card">
+          <div class="card-header"><h3>Sales vs Weekly Supply vs School Funds</h3></div>
+          <div class="dash-chart-body">
+            <canvas id="salesTrendChart" style="max-height:280px;"></canvas>
+          </div>
+        </div>
+        <div class="dash-rank-card">
+          <div class="card-header"><h3>🏆 Top Profit Items</h3></div>
+          <div class="product-rank-list" id="mostProfitableList"></div>
+        </div>
+      </div>
     </div>
+
+    <!-- ADMIN VIEW -->
     <div id="adminDashboardView" style="display:none;">
-        <div class="summary-cards">
-            <div class="summary-card purple"><div class="sc-label">School Income</div><div class="sc-value">₱0.00</div></div>
-            <div class="summary-card green"><div class="sc-label">Active Managers</div><div class="sc-value" id="adminActiveCount">0</div></div>
-        </div>
-        <div class="card" style="margin-top:20px;"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead><tbody id="adminQuickUserList"></tbody></table></div>
-    </div>
-  </section>
-
-  <!-- =========== INVENTORY (WEEKLY SHOPPING) =========== -->
-  <section class="page" id="page-inventory">
-    <div class="page-header">
-      <h2 class="page-title">Weekly Supplies & Groceries</h2>
-      <button class="btn btn-primary" id="btnAddInventory" onclick="InventoryMgr.openModal()">+ Record New Shopping Trip</button>
-    </div>
-
-    <!-- Purchase History Filter -->
-    <div class="filter-card">
-      <div class="form-group"><label>From</label><input type="date" id="invFilterFrom" class="input"></div>
-      <div class="form-group"><label>To</label><input type="date" id="invFilterTo" class="input"></div>
-      <button class="btn btn-secondary" onclick="InventoryMgr.loadPurchaseHistory()">Filter History</button>
-      <div class="total-badge">
-        <span class="text-muted">Spent in Range:</span>
-        <h2 id="historyTotalSpent" style="color:#2E7D32; margin:0;">₱0.00</h2>
+      <div class="page-header">
+        <h2 class="page-title">Principal's Oversight</h2>
       </div>
-    </div>
-
-    <div class="card">
-        <table class="data-table">
-          <thead><tr><th>Item</th><th>Current Stock</th><th>Total Value</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="inventoryBody"></tbody>
-        </table>
-    </div>
-
-    <!-- Multi-Add Modal -->
-    <div class="modal-overlay" id="inventoryModal" style="display:none;">
-      <div class="modal modal-lg">
-        <div class="modal-header"><h3>Record Weekly Shopping Trip</h3><button class="modal-close" onclick="InventoryMgr.closeModal()">✕</button></div>
-        <div class="modal-body">
-          <div class="form-section"><label>Date:</label><input type="date" id="invPurchaseDate" class="input" style="max-width:200px"></div>
-          
-          <div class="form-grid" style="background:#f4f4f4; padding:15px; border-radius:8px; display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:10px; margin-bottom:15px;">
-            <div class="form-group"><label>Item</label><input type="text" id="tempItemName" class="input"></div>
-            <div class="form-group"><label>Qty</label><input type="number" id="tempQty" class="input"></div>
-            <div class="form-group"><label>Unit</label><input type="text" id="tempUnit" class="input" placeholder="kg"></div>
-            <div class="form-group"><label>Cost</label><input type="number" id="tempCost" class="input"></div>
-            <div class="form-group" style="display:flex; align-items:flex-end;"><button class="btn btn-secondary" onclick="InventoryMgr.addItemToList()" style="width:100%">+ Add</button></div>
-          </div>
-
-          <div class="table-wrapper" style="max-height:200px; overflow-y:auto; border:1px solid #eee;">
-            <table class="data-table">
-              <thead><tr><th>Item</th><th>Qty</th><th>Cost</th><th></th></tr></thead>
-              <tbody id="shoppingListBody"></tbody>
-            </table>
-          </div>
-
-          <div style="text-align:right; margin-top:15px;"><h3 style="color:#2E7D32">Trip Total: <span id="tripTotalDisplay">₱0.00</span></h3></div>
-          <div class="form-actions"><button class="btn btn-ghost" onclick="InventoryMgr.closeModal()">Cancel</button><button class="btn btn-primary" id="saveInventoryBtn" onclick="InventoryMgr.saveTripToStock()">Save Trip</button></div>
+      <div class="dash-kpi-grid" style="grid-template-columns: repeat(3,1fr);">
+        <div class="kpi-card purple">
+          <div class="kpi-icon">🏛️</div>
+          <div class="kpi-label">Total School Income</div>
+          <div class="kpi-value" id="adminSchoolIncome">₱0.00</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-icon">👤</div>
+          <div class="kpi-label">Active Managers</div>
+          <div class="kpi-value" id="adminActiveCount">0</div>
+        </div>
+        <div class="kpi-card blue">
+          <div class="kpi-icon">🔒</div>
+          <div class="kpi-label">System Status</div>
+          <div class="kpi-value" style="font-size:18px; letter-spacing:0.04em;">SECURE</div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- =========== MODAL FOR VIEWING DAILY LEDGER IN-SYSTEM =========== -->
-<div class="modal-overlay" id="viewLedgerModal" style="display:none;">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <h3 id="viewLedgerTitle">Daily Ledger Details</h3>
-      <button class="modal-close" onclick="document.getElementById('viewLedgerModal').style.display='none'">✕</button>
-    </div>
-    <div class="modal-body" id="viewLedgerContent">
-      <!-- Content populated by JS -->
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-secondary" id="btnExportLedgerPDF">📄 Export as PDF</button>
-      <button class="btn btn-ghost" onclick="document.getElementById('viewLedgerModal').style.display='none'">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- =========== MODAL FOR VIEWING SHOPPING TRIP IN-SYSTEM =========== -->
-<div class="modal-overlay" id="viewTripModal" style="display:none;">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <h3 id="viewTripTitle">Shopping Trip Summary</h3>
-      <button class="modal-close" onclick="document.getElementById('viewTripModal').style.display='none'">✕</button>
-    </div>
-    <div class="modal-body" id="viewTripContent">
-      <!-- Content populated by JS -->
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-secondary" id="btnExportTripPDF">📄 Export as PDF</button>
-      <button class="btn btn-ghost" onclick="document.getElementById('viewTripModal').style.display='none'">Close</button>
-    </div>
-  </div>
-</div>
-
-  <!-- =========== DAILY RECORDS (LEDGER) =========== -->
-  <section class="page" id="page-daily-records">
-    <div class="page-header">
-      <h2 class="page-title">Daily Production Ledger</h2>
-      <div class="filter-group" style="display:flex; gap:10px; align-items:center;">
-        <input type="date" id="filterDateFrom" class="input-sm">
-        <span>to</span>
-        <input type="date" id="filterDateTo" class="input-sm">
-        <button class="btn btn-secondary btn-sm" onclick="DailyRecords.loadHistory()">Apply Filter</button>
-      </div>
-      <button class="btn btn-primary" id="btnAddRecord" onclick="DailyRecords.openModal()">+ Record Production</button>
-    </div>
-
-    <div class="card">
-      <table class="data-table">
-        <thead><tr><th>Date</th><th>Gross Sales</th><th>Total Expenses</th><th>Net Profit</th><th>Actions</th></tr></thead>
-        <tbody id="recordsHistoryBody"></tbody>
-      </table>
-    </div>
-
-    <div class="modal-overlay" id="recordModal" style="display:none;">
-      <div class="modal modal-lg">
-        <div class="modal-header"><h3>Daily Production & Sales</h3><button class="modal-close" onclick="DailyRecords.closeModal()">✕</button></div>
-        <div class="modal-body">
-          <div class="form-section"><label>Ledger Date</label><input type="date" id="modalRecordDate" class="input" style="max-width:200px"></div>
-          
+      <div class="card">
+        <div class="card-header"><h3>Canteen Manager Directory</h3></div>
+        <div class="table-wrapper">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Product Name</th>
-                <th>Qty Sold</th>
-                <th>Total Expense (Materials)</th>
-                <th>Selling Price</th>
-                <th>Total Sales</th>
-                <th>Profit</th>
-                <th></th>
+                <th>Name</th>
+                <th>Email</th>
+                <th class="th-center">Status</th>
               </tr>
             </thead>
-            <tbody id="productsBody"></tbody>
+            <tbody id="adminQuickUserList"></tbody>
           </table>
-          <button class="btn btn-sm btn-outline" onclick="DailyRecords.addProductRow()" style="margin-top:10px;">+ Add Product</button>
-
-          <div class="record-summary-box" style="background:#E8F5E9; padding:20px; border-radius:10px; margin-top:20px; display:grid; grid-template-columns: 1fr 1fr 1fr; text-align:center;">
-              <div><span>TOTAL SALES</span><br><strong id="rsTotalSales">₱0.00</strong></div>
-              <div><span>TOTAL EXPENSES</span><br><strong id="rsTotalCost">₱0.00</strong></div>
-              <div><span>DAILY NET PROFIT</span><br><strong id="rsNetProfit">₱0.00</strong></div>
-          </div>
-          <div class="form-actions"><button class="btn btn-ghost" onclick="DailyRecords.closeModal()">Cancel</button><button class="btn btn-primary" onclick="DailyRecords.saveRecord()">Save Entry</button></div>
         </div>
       </div>
     </div>
+
   </section>
 
-
-  <!-- =========== SCHOOL ALLOCATIONS =========== -->
-  <section class="page" id="page-expenses">
-    <div class="page-header"><h2 class="page-title">School Activity Fund Allocations</h2><button class="btn btn-primary" id="btnAddExpense" onclick="ExpensesMgr.openModal()">+ New Allocation</button></div>
-    <div class="filter-card">
-        <div class="form-group"><label>Filter Month</label><input type="month" id="expenseMonthFilter" class="input"></div>
-        <div class="total-badge" style="background:#E3F2FD; border-color:#2196F3;">
-            <span class="text-muted">Available Profit:</span>
-            <h2 id="expMonthlyIncome" style="color:#2196F3; margin:0;">₱0.00</h2>
-        </div>
-        <div class="total-badge">
-            <span class="text-muted">Remaining Balance:</span>
-            <h2 id="expRemainingBalance" style="margin:0;">₱0.00</h2>
-        </div>
+  <!-- ===========================================================
+       WEEKLY SUPPLIES & GROCERY SHOPPING
+       =========================================================== -->
+  <section class="page" id="page-inventory">
+    <div class="page-header">
+      <h2 class="page-title">Weekly Supplies &amp; Groceries</h2>
+      <button class="btn btn-primary" id="btnAddInventory" onclick="InventoryMgr.openModal()">
+        + Record Shopping Trip
+      </button>
     </div>
-    <div class="card"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Actions</th></tr></thead><tbody id="expensesBody"></tbody></table></div>
 
+    <!-- Purchase History Filter Bar -->
+    <div class="section-label">Purchase History</div>
+    <div class="filter-bar">
+      <div class="form-group">
+        <label>From Date</label>
+        <input type="date" id="invFilterFrom" class="input-sm">
+      </div>
+      <div class="form-group">
+        <label>To Date</label>
+        <input type="date" id="invFilterTo" class="input-sm">
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="InventoryMgr.loadPurchaseHistory()">
+        Apply Filter
+      </button>
+      <button class="btn btn-outline btn-sm" id="exportShoppingPDFBtn" onclick="InventoryMgr.exportShoppingHistoryPDF()">
+        📄 Export PDF
+      </button>
+      <div class="stat-chip" style="margin-left:auto;">
+        <span class="stat-chip-label">Spent in Range</span>
+        <span class="stat-chip-value" id="historyTotalSpent">₱0.00</span>
+      </div>
+    </div>
+
+    <!-- Purchase History Table -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><h3>Purchase History Log</h3></div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:110px;">Date</th>
+              <th>Item Purchased</th>
+              <th style="width:80px; text-align:center;">Qty</th>
+              <th style="width:80px;">Unit</th>
+              <th style="width:120px; text-align:right;">Cost (₱)</th>
+              <th style="width:130px; text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="purchaseHistoryBody">
+            <tr>
+              <td colspan="6">
+                <div class="tbl-empty">
+                  <div class="tbl-empty-icon">📋</div>
+                  <p>Select a date range and click Apply Filter.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Current Stock Table -->
+    <div class="section-label">Current Available Stock</div>
+    <div class="card">
+      <div class="card-header"><h3>Inventory — Stock Levels</h3></div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Supply Item</th>
+              <th style="width:120px;">Category</th>
+              <th style="width:130px; text-align:right;">Current Stock</th>
+              <th style="width:120px; text-align:right;">Total Value (₱)</th>
+              <th style="width:110px; text-align:center;">Status</th>
+              <th style="width:140px; text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryBody">
+            <tr>
+              <td colspan="6">
+                <div class="tbl-empty">
+                  <div class="tbl-empty-icon">📦</div>
+                  <p>No inventory items found.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── SHOPPING TRIP MODAL ── -->
+    <div class="modal-overlay" id="inventoryModal" style="display:none;">
+      <div class="modal modal-lg">
+        <div class="modal-header">
+          <h3>Record Weekly Shopping Trip</h3>
+          <button class="modal-close" onclick="InventoryMgr.closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-date-header">
+            <label>📅 Date of Purchase</label>
+            <input type="date" id="invPurchaseDate" class="input" style="max-width:180px;">
+          </div>
+
+          <div class="section-header">
+            <h4>Add Items to This Trip</h4>
+          </div>
+          <div class="item-input-bar">
+            <div class="form-group">
+              <label>Item Name</label>
+              <input type="text" id="tempItemName" class="input" placeholder="e.g. Cooking Oil">
+            </div>
+            <div class="form-group">
+              <label>Qty</label>
+              <input type="number" id="tempQty" class="input" placeholder="0" min="0">
+            </div>
+            <div class="form-group">
+              <label>Unit</label>
+              <input type="text" id="tempUnit" class="input" placeholder="kg / liter / pc">
+            </div>
+            <div class="form-group">
+              <label>Cost (₱)</label>
+              <input type="number" id="tempCost" class="input" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div style="padding-top:2px;">
+              <button type="button" class="btn btn-primary" onclick="InventoryMgr.addItemToList()">
+                + Add
+              </button>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <h4>Items in This Trip</h4>
+            <span style="font-size:12px; color:var(--text-muted);" id="tripItemCount">0 items</span>
+          </div>
+          <div class="table-wrapper" style="max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius);">
+            <table class="data-table">
+              <thead style="position:sticky; top:0; background:#fafafa; z-index:1;">
+                <tr>
+                  <th>Item</th>
+                  <th style="width:80px; text-align:center;">Qty</th>
+                  <th style="width:80px;">Unit</th>
+                  <th style="width:110px; text-align:right;">Cost (₱)</th>
+                  <th style="width:50px; text-align:center;"></th>
+                </tr>
+              </thead>
+              <tbody id="shoppingListBody">
+                <tr>
+                  <td colspan="5">
+                    <div class="tbl-empty" style="padding:18px;">
+                      <p>No items added yet.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="trip-total-box">
+            <div class="ttl-label">Grand Total for This Trip</div>
+            <div class="ttl-value" id="tripTotalDisplay">₱0.00</div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-ghost" onclick="InventoryMgr.closeModal()">Cancel</button>
+            <button class="btn btn-primary" id="saveInventoryBtn" onclick="InventoryMgr.saveTripToStock()">
+              💾 Save Trip to Stock
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Shopping Trip Modal -->
+    <div class="modal-overlay" id="viewTripModal" style="display:none;">
+      <div class="modal modal-lg">
+        <div class="modal-header">
+          <h3 id="viewTripTitle">Shopping Trip Details</h3>
+          <button class="modal-close" onclick="document.getElementById('viewTripModal').style.display='none'">✕</button>
+        </div>
+        <div class="modal-body" id="viewTripContent"></div>
+        <div style="padding:14px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-outline btn-sm" id="btnExportTripPDF">📄 Export PDF</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('viewTripModal').style.display='none'">Close</button>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ===========================================================
+       DAILY PRODUCTION LEDGER
+       =========================================================== -->
+  <section class="page" id="page-daily-records">
+    <div class="page-header">
+      <h2 class="page-title">Daily Production Ledger</h2>
+      <button class="btn btn-primary" id="btnAddRecord" onclick="DailyRecords.openModal()">
+        + Record Today's Production
+      </button>
+    </div>
+
+    <!-- Filter bar with totals -->
+    <div class="filter-bar">
+      <div class="form-group">
+        <label>From Date</label>
+        <input type="date" id="filterDateFrom" class="input-sm">
+      </div>
+      <div class="form-group">
+        <label>To Date</label>
+        <input type="date" id="filterDateTo" class="input-sm">
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="DailyRecords.loadHistory()">Apply Filter</button>
+      <button class="btn btn-outline btn-sm" id="exportLedgerPDFBtn" onclick="DailyRecords.exportDateRangePDF()">📄 Export PDF</button>
+
+      <div class="stat-chip" style="margin-left:auto;">
+        <span class="stat-chip-label">Total Sales</span>
+        <span class="stat-chip-value" id="ledgerTotalSales">₱0.00</span>
+      </div>
+      <div class="stat-chip amber">
+        <span class="stat-chip-label">Total Expenses</span>
+        <span class="stat-chip-value" id="ledgerTotalExpenses">₱0.00</span>
+      </div>
+      <div class="stat-chip blue">
+        <span class="stat-chip-label">Net Profit</span>
+        <span class="stat-chip-value" id="ledgerTotalProfit">₱0.00</span>
+      </div>
+    </div>
+
+    <!-- Ledger Table -->
+    <div class="card">
+      <div class="card-header"><h3>Ledger History</h3></div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:120px;">Date</th>
+              <th style="width:160px; text-align:right;">Gross Sales (₱)</th>
+              <th style="width:160px; text-align:right;">Expenses (₱)</th>
+              <th style="width:150px; text-align:right;">Net Profit (₱)</th>
+              <th style="width:150px; text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="recordsHistoryBody">
+            <tr>
+              <td colspan="5">
+                <div class="tbl-empty">
+                  <div class="tbl-empty-icon">📝</div>
+                  <p>No records found.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td class="total-label">TOTALS</td>
+              <td class="td-right total-green td-mono" id="footTotalSales">₱0.00</td>
+              <td class="td-right total-amber td-mono" id="footTotalExpenses">₱0.00</td>
+              <td class="td-right total-green td-mono" id="footNetProfit">₱0.00</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Daily Record Modal -->
+    <div class="modal-overlay" id="recordModal" style="display:none;">
+      <div class="modal modal-lg">
+        <div class="modal-header">
+          <h3>Record Daily Sales &amp; Production</h3>
+          <button class="modal-close" onclick="DailyRecords.closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-date-header">
+            <label>📅 Ledger Date</label>
+            <input type="date" id="modalRecordDate" class="input" style="max-width:180px;">
+          </div>
+
+          <div class="section-header" style="margin-bottom:10px;">
+            <h4>🛒 Products &amp; Production Costs</h4>
+          </div>
+
+          <div class="table-wrapper" style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-bottom:10px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Product Name</th>
+                  <th style="width:90px; text-align:center;">Qty Sold</th>
+                  <th style="width:160px; text-align:right;">Materials Cost (₱)</th>
+                  <th style="width:150px; text-align:right;">Selling Price (₱)</th>
+                  <th style="width:120px; text-align:right;">Total Sales</th>
+                  <th style="width:40px;"></th>
+                </tr>
+              </thead>
+              <tbody id="productsBody"></tbody>
+            </table>
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="DailyRecords.addProductRow()">+ Add Product Row</button>
+
+          <div class="record-summary-inline">
+            <div class="rsi-cell">
+              <div class="rsi-label">Total Sales</div>
+              <div class="rsi-val" id="rsTotalSales">₱0.00</div>
+            </div>
+            <div class="rsi-cell">
+              <div class="rsi-label">Total Expenses</div>
+              <div class="rsi-val expense" id="rsTotalCost">₱0.00</div>
+            </div>
+            <div class="rsi-cell">
+              <div class="rsi-label">Daily Net Profit</div>
+              <div class="rsi-val profit" id="rsNetProfit">₱0.00</div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-ghost" onclick="DailyRecords.closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="DailyRecords.saveRecord()">💾 Save Ledger Entry</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Ledger Modal -->
+    <div class="modal-overlay" id="viewLedgerModal" style="display:none;">
+      <div class="modal modal-lg">
+        <div class="modal-header">
+          <h3 id="viewLedgerTitle">Daily Ledger Details</h3>
+          <button class="modal-close" onclick="document.getElementById('viewLedgerModal').style.display='none'">✕</button>
+        </div>
+        <div class="modal-body" id="viewLedgerContent"></div>
+        <div style="padding:14px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-outline btn-sm" id="btnExportLedgerPDF">📄 Export PDF</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('viewLedgerModal').style.display='none'">Close</button>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ===========================================================
+       SCHOOL ACTIVITY FUND ALLOCATIONS
+       =========================================================== -->
+  <section class="page" id="page-expenses">
+    <div class="page-header">
+      <h2 class="page-title">School Activity Fund Allocations</h2>
+      <button class="btn btn-primary" id="btnAddExpense" onclick="ExpensesMgr.openModal()">
+        + New Allocation
+      </button>
+    </div>
+
+    <div class="filter-bar">
+      <div class="form-group">
+        <label>Filter Month</label>
+        <input type="month" id="expenseMonthFilter" class="input-sm">
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="ExpensesMgr.loadExpenses ? ExpensesMgr.loadExpenses() : null">Apply</button>
+
+      <div class="stat-chip blue" style="margin-left:auto;">
+        <span class="stat-chip-label">Available Profit</span>
+        <span class="stat-chip-value" id="expMonthlyIncome">₱0.00</span>
+      </div>
+      <div class="stat-chip amber">
+        <span class="stat-chip-label">Total Allocated</span>
+        <span class="stat-chip-value" id="expTotalExpenses">₱0.00</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-chip-label">Remaining Balance</span>
+        <span class="stat-chip-value" id="expRemainingBalance">₱0.00</span>
+      </div>
+    </div>
+
+    <div class="alert alert-danger" id="expenseOverAlert" style="display:none;">
+      🚨 Warning: School spending exceeds total canteen profit for this period!
+    </div>
+
+    <!-- Category Breakdown -->
+    <div class="section-label">Spending by Category</div>
+    <div class="card" style="margin-bottom:18px;">
+      <div class="expense-cat-grid" id="expCategoryGrid">
+        <div class="exp-cat-pill">
+          <span class="ecp-code">F</span>
+          <span class="ecp-name">Feeding Program</span>
+          <span class="ecp-amount" id="catF">₱0.00</span>
+        </div>
+        <div class="exp-cat-pill">
+          <span class="ecp-code">C</span>
+          <span class="ecp-name">Clinic / Health</span>
+          <span class="ecp-amount" id="catC">₱0.00</span>
+        </div>
+        <div class="exp-cat-pill">
+          <span class="ecp-code">FP</span>
+          <span class="ecp-name">Faculty / Pupils</span>
+          <span class="ecp-amount" id="catFP">₱0.00</span>
+        </div>
+        <div class="exp-cat-pill">
+          <span class="ecp-code">H</span>
+          <span class="ecp-name">Home Economics</span>
+          <span class="ecp-amount" id="catH">₱0.00</span>
+        </div>
+        <div class="exp-cat-pill">
+          <span class="ecp-code">S</span>
+          <span class="ecp-name">School Operation</span>
+          <span class="ecp-amount" id="catS">₱0.00</span>
+        </div>
+        <div class="exp-cat-pill">
+          <span class="ecp-code">R</span>
+          <span class="ecp-name">Revolving Fund</span>
+          <span class="ecp-amount" id="catR">₱0.00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Allocations Table -->
+    <div class="section-label">Allocation Records</div>
+    <div class="card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:120px;">Date</th>
+              <th>Activity / Description</th>
+              <th style="width:120px; text-align:center;">Category</th>
+              <th style="width:140px; text-align:right;">Amount (₱)</th>
+              <th style="width:130px; text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="expensesBody">
+            <tr>
+              <td colspan="5">
+                <div class="tbl-empty">
+                  <div class="tbl-empty-icon">💸</div>
+                  <p>No allocations recorded yet.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td class="total-label" colspan="3">TOTAL ALLOCATED</td>
+              <td class="td-right total-amber td-mono" id="expFootTotal">₱0.00</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Expense Modal -->
     <div class="modal-overlay" id="expenseModal" style="display:none;">
       <div class="modal">
-        <div class="modal-header"><h3>Record School Activity Cost</h3><button class="modal-close" onclick="ExpensesMgr.closeModal()">✕</button></div>
-        <div class="modal-body">
-          <div class="form-group"><label>Description</label><input type="text" id="expTitle" class="input"></div>
-          <div class="form-group"><label>Category</label>
+        <div class="modal-header">
+          <h3>Record School Activity Cost</h3>
+          <button class="modal-close" onclick="ExpensesMgr.closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+          <div class="form-group">
+            <label>Event / Item Description</label>
+            <input type="text" id="expTitle" class="input" placeholder="e.g. Feeding Program Supplies">
+          </div>
+          <div class="form-group">
+            <label>Activity Category</label>
             <select id="expCategory" class="input">
-              <option value="F">F - Feeding</option>
-              <option value="C">C - Clinic</option>
-              <option value="FP">FP - Faculty/Pupils</option>
-              <option value="H">H - HE</option>
-              <option value="S">S - School Operation</option>
-              <option value="R">R - Revolving</option>
+              <option value="F">F — Feeding Program</option>
+              <option value="C">C — Clinic / Health</option>
+              <option value="FP">FP — Faculty / Pupils</option>
+              <option value="H">H — Home Economics (HE)</option>
+              <option value="S">S — School Operation</option>
+              <option value="R">R — Revolving Fund</option>
             </select>
           </div>
-          <div class="form-group"><label>Amount (₱)</label><input type="number" id="expAmount" class="input"></div>
-          <div class="form-group"><label>Date</label><input type="date" id="expDate" class="input"></div>
-          <div class="form-actions"><button class="btn btn-primary" onclick="ExpensesMgr.saveExpense()">Save Deduction</button></div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Amount (₱)</label>
+              <input type="number" id="expAmount" class="input" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="expDate" class="input">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-ghost" onclick="ExpensesMgr.closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="ExpensesMgr.saveExpense()">💾 Save Allocation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ===========================================================
+       REPORTS
+       =========================================================== -->
+  <section class="page" id="page-reports">
+    <div class="page-header">
+      <h2 class="page-title">Generate Official Reports</h2>
+      <button class="btn btn-secondary" id="exportPDFBtn">📄 Export Formal PDF</button>
+    </div>
+    <div class="card">
+      <div id="reportOutput" style="padding:20px;"></div>
+    </div>
+  </section>
+
+  <!-- ===========================================================
+       ACCOUNT SECURITY / PROFILE
+       =========================================================== -->
+  <section class="page" id="page-profile">
+    <div class="page-header">
+      <h2 class="page-title">Account &amp; Security</h2>
+    </div>
+
+    <div class="profile-layout">
+      <div class="profile-card-main">
+        <div class="profile-cover"></div>
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar-lg" id="profAvatar">?</div>
+        </div>
+        <div class="profile-info">
+          <div class="profile-name" id="profName">Loading…</div>
+          <div class="profile-email" id="profEmail">—</div>
+          <div style="margin-bottom:14px;">
+            <span class="status-badge status-manager">Canteen Manager</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="pdr-label">Account Type</span>
+            <span class="pdr-value" id="profRole">Manager</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="pdr-label">Member Since</span>
+            <span class="pdr-value" id="profSince">—</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="pdr-label">Last Login</span>
+            <span class="pdr-value" id="profLastLogin">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pw-form-card">
+        <div class="card-header">
+          <h3>🔐 Update Password</h3>
+        </div>
+        <div class="pw-form-body">
+          <div class="alert alert-warning" style="margin-bottom:0;">
+            <span class="alert-icon">ℹ️</span>
+            Choose a strong password with at least 8 characters, including numbers and symbols.
+          </div>
+          <form id="changePasswordForm" style="display:flex; flex-direction:column; gap:16px;">
+            <div class="form-group">
+              <label>Current Password</label>
+              <input type="password" id="currPass" class="input" placeholder="Enter your current password" required>
+            </div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" id="newPass" class="input" placeholder="Minimum 8 characters" required>
+              <div class="pw-strength">
+                <div class="pw-bar" id="ps1"></div>
+                <div class="pw-bar" id="ps2"></div>
+                <div class="pw-bar" id="ps3"></div>
+                <div class="pw-bar" id="ps4"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Confirm New Password</label>
+              <input type="password" id="confirmPass" class="input" placeholder="Repeat new password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;">
+              🔒 Update Password
+            </button>
+          </form>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- REMAINING PAGES -->
-  <section class="page" id="page-reports">
-    <div class="page-header"><h2 class="page-title">Reports</h2><button class="btn btn-secondary" id="exportPDFBtn">Export PDF</button></div>
-    <div class="card"><div id="reportOutput"></div></div>
-  </section>
-
-  <section class="page" id="page-profile">
-    <div class="page-header"><h2>Account Security</h2></div>
-    <div class="card" style="max-width:600px; margin:auto; padding:30px;">
-        <h2 id="profName">User</h2>
-        <p id="profEmail" class="text-muted"></p>
-        <hr>
-        <form id="changePasswordForm">
-            <div class="form-group"><label>Current Password</label><input type="password" id="currPass" class="input" required></div>
-            <div class="form-group"><label>New Password</label><input type="password" id="newPass" class="input" required></div>
-            <button type="submit" class="btn btn-primary">Update Password</button>
-        </form>
-    </div>
-  </section>
-
+  <!-- ===========================================================
+       ADMIN — USER MANAGEMENT
+       =========================================================== -->
   <section class="page" id="page-admin">
-    <div class="page-header"><h2>Manager Account Management</h2><button class="btn btn-primary" onclick="AdminPanel.openModal()">+ Add Manager</button></div>
-    <div class="summary-cards">
-        <div class="summary-card green"><div class="sc-label">Total Users</div><div id="adminTotalUsers">0</div></div>
-        <div class="summary-card blue"><div class="sc-label">Active Managers</div><div id="adminActiveManagers">0</div></div>
+    <div class="page-header">
+      <h2 class="page-title">Manager Account Management</h2>
+      <button class="btn btn-primary" onclick="AdminPanel.openModal()">+ Add Manager</button>
     </div>
-    <div class="card"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody id="usersBody"></tbody></table></div>
 
+    <div class="filter-bar" style="margin-bottom:18px;">
+      <div class="stat-chip">
+        <span class="stat-chip-label">Total Users</span>
+        <span class="stat-chip-value" id="adminTotalUsers">0</span>
+      </div>
+      <div class="stat-chip blue">
+        <span class="stat-chip-label">Active Managers</span>
+        <span class="stat-chip-value" id="adminActiveManagers">0</span>
+      </div>
+      <div class="stat-chip amber">
+        <span class="stat-chip-label">Total Admins</span>
+        <span class="stat-chip-value" id="adminTotalAdmins">0</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th style="width:100px; text-align:center;">Role</th>
+              <th style="width:100px; text-align:center;">Status</th>
+              <th style="width:150px; text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody">
+            <tr>
+              <td colspan="5">
+                <div class="tbl-empty">
+                  <div class="tbl-empty-icon">👥</div>
+                  <p>No users found.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add Manager Modal -->
     <div class="modal-overlay" id="managerModal" style="display:none;">
       <div class="modal">
-        <div class="modal-header"><h3>New Manager Account</h3><button class="modal-close" onclick="AdminPanel.closeModal()">✕</button></div>
-        <div class="modal-body">
-          <div class="form-group"><label>Full Name</label><input type="text" id="managerName" class="input"></div>
-          <div class="form-group"><label>Google Email</label><input type="email" id="managerEmail" class="input"></div>
-          <div class="form-group"><label>Temp Password</label><input type="text" id="managerTempPass" class="input"></div>
-          <div class="form-actions"><button class="btn btn-primary" onclick="AdminPanel.saveManager()">Create Account</button></div>
+        <div class="modal-header">
+          <h3>New Manager Account</h3>
+          <button class="modal-close" onclick="AdminPanel.closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="managerName" class="input" placeholder="e.g. Maria Santos">
+          </div>
+          <div class="form-group">
+            <label>Google Email</label>
+            <input type="email" id="managerEmail" class="input" placeholder="email@school.edu.ph">
+          </div>
+          <div class="form-group">
+            <label>Temporary Password</label>
+            <input type="text" id="managerTempPass" class="input" placeholder="Minimum 8 characters">
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-ghost" onclick="AdminPanel.closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="AdminPanel.saveManager()">Create Account</button>
+          </div>
         </div>
       </div>
     </div>
+
   </section>
 
 </main>
 
+<div id="toast-container"></div>
+
+<!-- Script load order is critical -->
 <script src="js/config.js"></script>
+<script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
-<script src="js/notifications.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/daily-records.js"></script>
-<script src="js/inventory.js"></script>
-<script src="js/expenses.js"></script>
 <script src="js/reports.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/daily-records.js"></script>
+<script src="js/expenses.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/profile.js"></script>
+<script src="js/dashboard.js"></script>
 <script src="js/main.js"></script>
+
+<!-- ── ACTION BUTTON HELPERS ──
+     These helpers expose a standard HTML snippet your JS files
+     can call to render the 3-button action group.
+     Usage in JS:  row.innerHTML += actionButtons('InventoryMgr', id);
+     ─────────────────────────────────────────────────────────── -->
+<script>
+  /**
+   * Returns an HTML string with View / Edit / Delete buttons.
+   * @param {string} ns   - JS namespace (e.g. 'InventoryMgr', 'DailyRecords')
+   * @param {string} id   - document ID
+   * @param {object} opts - { view, edit, delete } booleans (all true by default)
+   */
+  function actionButtons(ns, id, opts) {
+    opts = Object.assign({ view: true, edit: true, del: true }, opts);
+    var safe = JSON.stringify(id).replace(/'/g, "\\'");
+    var html = '<div class="action-group">';
+    if (opts.view)
+      html += '<button class="act-btn act-btn-view" onclick="' + ns + '.viewRecord(' + safe + ')">👁 View</button>';
+    if (opts.edit)
+      html += '<button class="act-btn act-btn-edit" onclick="' + ns + '.editRecord(' + safe + ')">✏️ Edit</button>';
+    if (opts.del)
+      html += '<button class="act-btn act-btn-delete" onclick="' + ns + '.deleteRecord(' + safe + ')">🗑 Delete</button>';
+    html += '</div>';
+    return html;
+  }
+
+  // Expose globally so any JS module can use it
+  window.actionButtons = actionButtons;
+</script>
+
 </body>
 </html>

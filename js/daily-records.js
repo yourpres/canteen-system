@@ -1,284 +1,185 @@
-// =============================================
-// Daily Records Module (SIMPLIFIED, FILTERABLE & EDITABLE)
-// =============================================
-
 const DailyRecords = {
-  products: [],
-  editingRecordId: null,
+    products: [],
+    editingId: null,
 
-  getStoredRecords() {
-    return JSON.parse(localStorage.getItem('daily_records')) || [];
-  },
+    load() { this.loadHistory(); },
 
-  setStoredRecords(records) {
-    localStorage.setItem('daily_records', JSON.stringify(records));
-  },
+    openModal(record = null) {
+        this.editingId = record ? record.id : null;
+        this.products = record ? JSON.parse(JSON.stringify(record.products)) : [{ name: '', quantity: 0, cost: 0, price: 0 }];
+        document.getElementById('modalRecordDate').value = record ? record.date : todayStr();
+        this.renderForm();
+        document.getElementById('recordModal').style.display = 'flex';
+    },
 
-  load() {
-    this.setupModal();
-    this.loadHistory(); 
-  },
+    closeModal() { document.getElementById('recordModal').style.display = 'none'; },
 
-  setupModal() {
-    const addBtn = document.getElementById('btnAddRecord');
-    if (addBtn) addBtn.onclick = () => this.openModal();
-  },
+    addProductRow() {
+        this.products.push({ name: '', quantity: 0, cost: 0, price: 0 });
+        this.renderForm();
+    },
 
-  clearFilter() {
-    document.getElementById('filterDateFrom').value = '';
-    document.getElementById('filterDateTo').value = '';
-    this.loadHistory();
-  },
+    updateValue(i, field, val) {
+        this.products[i][field] = field === 'name' ? val : parseFloat(val) || 0;
+        this.calculate();
+    },
 
-  openModal(recordData = null) {
-    this.products = [];
-    // If recordData exists, we are EDITING. If null, we are CREATING NEW.
-    this.editingRecordId = recordData ? recordData.id : null;
+    removeRow(i) {
+        this.products.splice(i, 1);
+        this.renderForm();
+    },
 
-    const modal = document.getElementById('recordModal');
-    const dateInput = document.getElementById('modalRecordDate');
-    const title = document.querySelector('#recordModal h3');
+    calculate() {
+        let sales = 0, expenses = 0;
+        this.products.forEach((p, i) => {
+            const rowSales = p.quantity * p.price;
+            sales += rowSales;
+            expenses += p.cost; // Fixed: Not multiplied by qty
+            // Update row labels if they exist
+            const sLab = document.getElementById(`rowSales_${i}`);
+            if(sLab) sLab.textContent = formatCurrency(rowSales);
+        });
+        document.getElementById('rsTotalSales').textContent = formatCurrency(sales);
+        document.getElementById('rsTotalCost').textContent = formatCurrency(expenses);
+        document.getElementById('rsNetProfit').textContent = formatCurrency(sales - expenses);
+    },
 
-    if (recordData) {
-      if(title) title.textContent = "Edit Ledger Entry";
-      dateInput.value = recordData.date;
-      // Deep copy products to avoid direct reference issues
-      this.products = JSON.parse(JSON.stringify(recordData.products));
-    } else {
-      if(title) title.textContent = "Record Daily Sales & Expenses";
-      dateInput.value = new Date().toISOString().split('T')[0];
-      this.addProductRow(); 
-    }
+    renderForm() {
+        const tbody = document.getElementById('productsBody');
+        tbody.innerHTML = this.products.map((p, i) => `
+            <tr>
+                <td><input type="text" class="table-input" value="${p.name}" oninput="DailyRecords.updateValue(${i},'name',this.value)"></td>
+                <td style="text-align:center;"><input type="number" class="table-input" value="${p.quantity}" oninput="DailyRecords.updateValue(${i},'quantity',this.value)"></td>
+                <td style="text-align:right;"><input type="number" class="table-input" value="${p.cost}" oninput="DailyRecords.updateValue(${i},'cost',this.value)"></td>
+                <td style="text-align:right;"><input type="number" class="table-input" value="${p.price}" oninput="DailyRecords.updateValue(${i},'price',this.value)"></td>
+                <td id="rowSales_${i}" class="font-bold" style="text-align:right;">${formatCurrency(p.quantity * p.price)}</td>
+                <td style="text-align:center;"><button onclick="DailyRecords.removeRow(${i})" class="act-btn act-btn-delete">✕</button></td>
+            </tr>
+        `).join('');
+        this.calculate();
+    },
 
-    this.renderTable();
-    modal.style.display = 'flex';
-  },
+    saveRecord() {
+        const date = document.getElementById('modalRecordDate').value;
+        const totalSales = parseFloat(document.getElementById('rsTotalSales').textContent.replace(/[^\d.-]/g, ''));
+        const totalCost = parseFloat(document.getElementById('rsTotalCost').textContent.replace(/[^\d.-]/g, ''));
+        
+        const entry = {
+            id: this.editingId || 'rec_' + Date.now(),
+            date, products: this.products.filter(p => p.name),
+            totalSales, totalCost, netProfit: totalSales - totalCost,
+            createdBy: localStorage.getItem('userName')
+        };
 
-  closeModal() {
-    this.editingRecordId = null; // Reset editing state
-    document.getElementById('recordModal').style.display = 'none';
-  },
+        let history = JSON.parse(localStorage.getItem('daily_records')) || [];
+        if(this.editingId) history = history.map(h => h.id === this.editingId ? entry : h);
+        else history.push(entry);
 
-  addProductRow() {
-    this.products.push({ 
-        id: Date.now() + Math.random(), 
-        name: '', 
-        quantity: 0, 
-        cost: 0,  
-        price: 0  
-    });
-    this.renderTable();
-  },
-
-  removeRow(index) {
-    this.products.splice(index, 1);
-    this.renderTable();
-  },
-
-  updateValue(index, field, value) {
-    const val = (field === 'name') ? value : parseFloat(value) || 0;
-    this.products[index][field] = val;
-    
-    const rowSales = this.products[index].quantity * this.products[index].price;
-    const rowCost = this.products[index].cost; 
-    
-    const salesLabel = document.getElementById(`rowSales_${index}`);
-    const costLabel = document.getElementById(`rowCost_${index}`);
-    
-    if (salesLabel) salesLabel.textContent = formatCurrency(rowSales);
-    if (costLabel) costLabel.textContent = formatCurrency(rowCost);
-
-    this.calculateGrandTotals();
-  },
-
-  renderTable() {
-    const tbody = document.getElementById('productsBody');
-    if (!tbody) return;
-
-    tbody.innerHTML = this.products.map((p, i) => `
-      <tr>
-        <td><input type="text" class="table-input" value="${p.name}" placeholder="e.g. Lomi" oninput="DailyRecords.updateValue(${i}, 'name', this.value)"></td>
-        <td><input type="number" class="table-input" value="${p.quantity}" oninput="DailyRecords.updateValue(${i}, 'quantity', this.value)"></td>
-        <td><input type="number" class="table-input" value="${p.cost}" placeholder="Fixed Cost" oninput="DailyRecords.updateValue(${i}, 'cost', this.value)"></td>
-        <td><input type="number" class="table-input" value="${p.price}" placeholder="Price/ea" oninput="DailyRecords.updateValue(${i}, 'price', this.value)"></td>
-        <td id="rowSales_${i}" class="font-bold" style="color:#2E7D32">${formatCurrency(p.quantity * p.price)}</td>
-        <td id="rowCost_${i}" class="font-bold" style="color:#d32f2f">${formatCurrency(p.cost)}</td>
-        <td><button class="btn-delete" onclick="DailyRecords.removeRow(${i})">✕</button></td>
-      </tr>
-    `).join('');
-    
-    this.calculateGrandTotals();
-  },
-
-  calculateGrandTotals() {
-    let totalSales = 0;
-    let totalExpenses = 0;
-
-    this.products.forEach(p => {
-        totalSales += (p.quantity * p.price);
-        totalExpenses += p.cost; 
-    });
-
-    const netProfit = totalSales - totalExpenses;
-
-    document.getElementById('rsTotalSales').textContent = formatCurrency(totalSales);
-    document.getElementById('rsTotalCost').textContent = formatCurrency(totalExpenses);
-    document.getElementById('rsNetProfit').textContent = formatCurrency(netProfit);
-    
-    document.getElementById('rsNetProfit').style.color = netProfit < 0 ? '#d32f2f' : '#2E7D32';
-  },
-
-  saveRecord() {
-    const date = document.getElementById('modalRecordDate').value;
-    if (!date) return showToast("Select Date", "error");
-
-    const validProducts = this.products.filter(p => p.name.trim() !== '');
-    if (validProducts.length === 0) return showToast("Add at least one product", "error");
-
-    let totalSales = 0;
-    let totalCost = 0;
-    validProducts.forEach(p => {
-        totalSales += (p.quantity * p.price);
-        totalCost += p.cost;
-    });
-
-    const recordEntry = {
-      id: this.editingRecordId || 'rec_' + Date.now(), // Keep ID if editing
-      date,
-      products: validProducts,
-      totalSales,
-      totalCost, 
-      netProfit: totalSales - totalCost,
-      createdBy: localStorage.getItem('userName') || "Manager"
-    };
-
-    let history = this.getStoredRecords();
-
-    if (this.editingRecordId) {
-      // Update existing record
-      history = history.map(r => r.id === this.editingRecordId ? recordEntry : r);
-      showToast("Ledger entry updated!");
-    } else {
-      // Add new record
-      history.push(recordEntry);
-      showToast("Daily Ledger entry saved!");
-    }
-
-    this.setStoredRecords(history);
-    this.closeModal();
-    this.loadHistory();
-
-    if(window.Dashboard) Dashboard.load();
-  },
-
-  loadHistory() {
-    const tbody = document.getElementById('recordsHistoryBody');
-    if (!tbody) return;
-
-    let history = this.getStoredRecords();
-    const fromDate = document.getElementById('filterDateFrom').value;
-    const toDate = document.getElementById('filterDateTo').value;
-
-    if (fromDate && toDate) {
-        history = history.filter(r => r.date >= fromDate && r.date <= toDate);
-    }
-
-    if (history.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg" style="padding:30px;">No records found.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = history.sort((a,b) => new Date(b.date) - new Date(a.date)).map(r => `
-      <tr>
-        <td><strong>${r.date}</strong></td>
-        <td class="text-green">${formatCurrency(r.totalSales)}</td>
-        <td class="text-red">${formatCurrency(r.totalCost)}</td>
-        <td class="font-bold" style="color: ${r.netProfit >= 0 ? '#2E7D32' : '#d32f2f'}">${formatCurrency(r.netProfit)}</td>
-        <td style="text-align: center;">
-          <div style="display: flex; gap: 8px; justify-content: center;">
-            <button class="action-btn btn-view" onclick="DailyRecords.viewFormalLedger('${r.id}')">👁 View</button>
-            <button class="action-btn btn-edit" onclick="DailyRecords.editRecord('${r.id}')">✏️ Edit</button>
-            <button class="action-btn btn-delete-record" onclick="DailyRecords.deleteRecord('${r.id}')">🗑 Delete</button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
-  },
-
-  // --- NEW EDIT FUNCTION ---
-  editRecord(id) {
-    const history = this.getStoredRecords();
-    const record = history.find(r => r.id === id);
-    if (record) {
-        this.openModal(record);
-    } else {
-        showToast("Record not found", "error");
-    }
-  },
-
-  deleteRecord(id) {
-    if(confirm("Permanently delete this ledger entry?")) {
-        let history = this.getStoredRecords().filter(r => r.id !== id);
-        this.setStoredRecords(history);
+        localStorage.setItem('daily_records', JSON.stringify(history));
+        this.closeModal();
         this.loadHistory();
-        showToast("Entry removed", "error");
+        showToast("Daily Ledger Updated");
+    },
+
+    loadHistory() {
+        const from = document.getElementById('filterDateFrom').value;
+        const to = document.getElementById('filterDateTo').value;
+        let history = JSON.parse(localStorage.getItem('daily_records')) || [];
+        
+        // Apply filter based on what dates are provided
+        if(from || to) {
+            history = history.filter(h => {
+                if(from && to) return h.date >= from && h.date <= to;
+                if(from) return h.date >= from;
+                if(to) return h.date <= to;
+                return true;
+            });
+        }
+
+        let totalSales = 0, totalExpenses = 0, totalProfit = 0;
+        document.getElementById('recordsHistoryBody').innerHTML = history.length === 0
+            ? '<tr><td colspan="5"><div class="tbl-empty"><div class="tbl-empty-icon">📝</div><p>No records found.</p></div></td></tr>'
+            : history.sort((a,b)=>b.date.localeCompare(a.date)).map(h => {
+                totalSales += h.totalSales;
+                totalExpenses += h.totalCost;
+                totalProfit += h.netProfit;
+                return `
+                    <tr>
+                        <td style="text-align:left;">${h.date}</td>
+                        <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">${formatCurrency(h.totalSales)}</td>
+                        <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">${formatCurrency(h.totalCost)}</td>
+                        <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">${formatCurrency(h.netProfit)}</td>
+                        <td style="text-align:center;">
+                            <div class="action-group">
+                                <button class="act-btn act-btn-view" onclick="DailyRecords.viewInSystem('${h.id}')">👁 View</button>
+                                <button class="act-btn act-btn-view" onclick="DailyRecords.exportSingleRecordPDF('${h.id}')">📄 PDF</button>
+                                <button class="act-btn act-btn-delete" onclick="DailyRecords.deleteRecord('${h.id}')">🗑 Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        // Update footer totals
+        document.getElementById('footTotalSales').textContent = formatCurrency(totalSales);
+        document.getElementById('footTotalExpenses').textContent = formatCurrency(totalExpenses);
+        document.getElementById('footNetProfit').textContent = formatCurrency(totalProfit);
+
+        // Update header chips
+        document.getElementById('ledgerTotalSales').textContent = formatCurrency(totalSales);
+        document.getElementById('ledgerTotalExpenses').textContent = formatCurrency(totalExpenses);
+        document.getElementById('ledgerTotalProfit').textContent = formatCurrency(totalProfit);
+    },
+
+    viewInSystem(id) {
+        const r = JSON.parse(localStorage.getItem('daily_records')).find(rec => rec.id === id);
+        // Open in edit mode
+        this.openModal(r);
+    },
+
+    deleteRecord(id) {
+        if (!confirm("Delete this ledger entry? This action cannot be undone.")) return;
+        
+        let history = JSON.parse(localStorage.getItem('daily_records')) || [];
+        history = history.filter(h => h.id !== id);
+        localStorage.setItem('daily_records', JSON.stringify(history));
+        this.loadHistory();
+        showToast("Ledger entry deleted successfully", "success");
+    },
+
+    exportDateRangePDF() {
+        const from = document.getElementById('filterDateFrom').value;
+        const to = document.getElementById('filterDateTo').value;
+        let history = JSON.parse(localStorage.getItem('daily_records')) || [];
+        
+        if (!from && !to) return showToast("Please select at least one date", "error");
+        
+        let filtered = history.filter(h => {
+            if(from && to) return h.date >= from && h.date <= to;
+            if(from) return h.date >= from;
+            if(to) return h.date <= to;
+            return true;
+        });
+        
+        if (filtered.length === 0) return showToast("No records found for the selected date range", "error");
+        
+        // Call async function
+        Reports.exportLedgerDateRangePDF(filtered, from, to).catch(err => {
+            console.error('PDF export error:', err);
+            showToast("Error generating PDF", "error");
+        });
+    },
+
+    exportSingleRecordPDF(recordId) {
+        let history = JSON.parse(localStorage.getItem('daily_records')) || [];
+        const record = history.find(r => r.id === recordId);
+        
+        if (!record) return showToast("Record not found", "error");
+        
+        // Call async function
+        Reports.exportLedgerPDF(record).catch(err => {
+            console.error('PDF export error:', err);
+            showToast("Error generating PDF", "error");
+        });
     }
-  },
-
-  viewFormalLedger(id) {
-    const r = this.getStoredRecords().find(rec => rec.id === id);
-    if (!r) return;
-
-    const content = document.getElementById('viewLedgerContent');
-    document.getElementById('viewLedgerTitle').textContent = `Ledger Details: ${r.date}`;
-    
-    let rowsHtml = r.products.map(p => `
-      <tr>
-        <td>${p.name}</td>
-        <td>${p.quantity}</td>
-        <td>${formatCurrency(p.cost)}</td>
-        <td>${formatCurrency(p.price)}</td>
-        <td>${formatCurrency(p.quantity * p.price)}</td>
-      </tr>
-    `).join('');
-
-    content.innerHTML = `
-      <div style="padding:10px; border:1px solid #ddd; background:#fff;">
-        <h4 style="color:var(--deped-green)">SAN IGNACIO ELEMENTARY SCHOOL</h4>
-        <p><strong>Date:</strong> ${r.date} | <strong>Prepared by:</strong> ${r.createdBy}</p>
-        <table class="data-table">
-          <thead><tr><th>Item</th><th>Qty</th><th>Expense</th><th>Price</th><th>Sales</th></tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-        <div style="margin-top:15px; text-align:right;">
-          <p>Total Sales: <strong>${formatCurrency(r.totalSales)}</strong></p>
-          <p>Total Expenses: <strong>${formatCurrency(r.totalCost)}</strong></p>
-          <h3 style="color:var(--deped-green)">Net Profit: ${formatCurrency(r.netProfit)}</h3>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('viewLedgerModal').style.display = 'flex';
-
-    document.getElementById('btnExportLedgerPDF').onclick = () => {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.text("SAN IGNACIO ELEMENTARY SCHOOL", 105, 20, { align: "center" });
-      doc.text("Daily Canteen Production Ledger", 105, 30, { align: "center" });
-      doc.text(`Date: ${r.date}`, 105, 40, { align: "center" });
-
-      doc.autoTable({
-        startY: 50,
-        head: [['Item', 'Qty', 'Materials Expense', 'Selling Price', 'Total Sales']],
-        body: r.products.map(p => [p.name, p.quantity, formatCurrency(p.cost), formatCurrency(p.price), formatCurrency(p.quantity * p.price)]),
-        theme: 'grid', headStyles: { fillColor: [46, 125, 50] }
-      });
-
-      let finalY = doc.lastAutoTable.finalY + 10;
-      doc.text(`Total Sales: ${formatCurrency(r.totalSales)}`, 140, finalY);
-      doc.text(`Total Expenses: ${formatCurrency(r.totalCost)}`, 140, finalY + 10);
-      doc.text(`Daily Net Profit: ${formatCurrency(r.netProfit)}`, 140, finalY + 20);
-      doc.save(`Ledger_${r.date}.pdf`);
-    };
-  },
 };
